@@ -76,7 +76,6 @@ int phasor2_max;
 int phasor2_min;
 float maxivolume;
 
-
 int wave_1_type;
 int wave_2_type;
   // 0. noise
@@ -562,7 +561,8 @@ color5 = strip.Color(0, 0, 0); // Cyan
 color6 = strip.Color(0, 0, 0); // Magenta
 color7 = strip.Color(0, 0, 0); // Yellow
 color8 = strip.Color(0, 0, 0); // Red
-
+wave_1_type = 0;
+wave_2_type = 0;
 
 xTaskCreatePinnedToCore(
         maximilianCopyTask,   /* Function to implement the task */
