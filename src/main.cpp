@@ -76,6 +76,16 @@ int phasor2_max;
 int phasor2_min;
 float maxivolume;
 
+
+int wave_1_type;
+int wave_2_type;
+  // 0. noise
+  // 1. sinewave
+  // 2. square
+  // 3. triangle
+  // notimp 4. triangle
+  // notimp 5. impulse
+
 uint32_t color1;
 uint32_t color2;
 uint32_t color3;
@@ -97,10 +107,109 @@ void config_audio(){
 }
 
 void play(float *output){
-  myOutputs.stereo(myOsc1.sinewave(wave_1_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
-  myOutputs.stereo(myOsc2.sinewave(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
-  output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
-  output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  if ((wave_1_type==0) & (wave_2_type==0)) {
+    myOutputs.stereo(myOsc1.noise(),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.noise(),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+  if ((wave_1_type==1) & (wave_2_type==0)) {
+    myOutputs.stereo(myOsc1.sinewave(wave_1_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.noise(),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+  if ((wave_1_type==2) & (wave_2_type==0)) {
+    myOutputs.stereo(myOsc1.square(wave_1_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.noise(),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+  if ((wave_1_type==3) & (wave_2_type==0)) {
+    myOutputs.stereo(myOsc1.triangle(wave_1_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.noise(),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+
+
+
+  if ((wave_1_type==0) & (wave_2_type==1)) {
+    myOutputs.stereo(myOsc1.noise(),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.sinewave(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+  if ((wave_1_type==1) & (wave_2_type==1)) {
+    myOutputs.stereo(myOsc1.sinewave(wave_1_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.sinewave(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+  if ((wave_1_type==2) & (wave_2_type==1)) {
+    myOutputs.stereo(myOsc1.square(wave_1_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.sinewave(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+  if ((wave_1_type==3) & (wave_2_type==1)) {
+    myOutputs.stereo(myOsc1.triangle(wave_1_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.sinewave(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+
+
+  if ((wave_1_type==0) & (wave_2_type==2)) {
+    myOutputs.stereo(myOsc1.noise(),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.square(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+    if ((wave_1_type==1) & (wave_2_type==2)) {
+    myOutputs.stereo(myOsc1.sinewave(wave_1_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.square(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+  if ((wave_1_type==2) & (wave_2_type==2)) {
+    myOutputs.stereo(myOsc1.square(wave_2_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.square(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+  if ((wave_1_type==3) & (wave_2_type==2)) {
+    myOutputs.stereo(myOsc1.triangle(wave_2_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.square(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+
+
+  if ((wave_1_type==0) & (wave_2_type==3)) {
+    myOutputs.stereo(myOsc1.noise(),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.triangle(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+  if ((wave_1_type==1) & (wave_2_type==3)) {
+    myOutputs.stereo(myOsc1.sinewave(wave_1_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.triangle(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+  if ((wave_1_type==2) & (wave_2_type==3)) {
+    myOutputs.stereo(myOsc1.square(wave_1_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.triangle(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
+  if ((wave_1_type==3) & (wave_2_type==3)) {
+    myOutputs.stereo(myOsc1.triangle(wave_1_freq),myStereoOutput1,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);//Stereo, Quad or 8 Channel. Specify the input to be mixed, the output[numberofchannels], and the pan (0-1,equal power).
+    myOutputs.stereo(myOsc2.triangle(wave_2_freq),myStereoOutput2,(myAutoPanner.sinewave(panner_freq)+1)/panner_div);
+    output[0]=(myStereoOutput1[0]+myStereoOutput2[0])*myOsc3.sinewave(myPhasor1.phasorBetween(phasor1_freq,phasor1_min,phasor1_max));//When working with mixing, you need to specify the outputs explicitly
+    output[1]=(myStereoOutput1[1]+myStereoOutput2[1])*myOsc4.sinewave(myPhasor2.phasorBetween(phasor2_freq, phasor2_min, phasor2_max));
+  }
 }
 
 //sound design system definition - end
@@ -208,8 +317,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
               receive_outputcontrol_data = true;
             };
             if (receive_outputcontrol_data){
-              int l1r, l1g, l1b, l2r, l2g, l2b, l3r, l3g, l3b, l4r, l4g, l4b, l5r, l5g, l5b, l6r, l6g, l6b, l7r, l7g, l7b, l8r, l8g ,l8b, ld, w1f, w2f, pf, pd, ph1f, ph1max, ph1min, ph2f, ph2max, ph2min, vol;
-              if (sscanf((const char*)payload, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &l1r, &l1g, &l1b, &l2r, &l2g, &l2b, &l3r, &l3g, &l3b, &l4r, &l4g, &l4b, &l5r, &l5g, &l5b, &l6r, &l6g, &l6b, &l7r, &l7g, &l7b, &l8r, &l8g ,&l8b, &ld,  &w1f, &w2f, &pf, &pd, &ph1f, &ph1max, &ph1min, &ph2f, &ph2max, &ph2min, &vol) ==  36) { 
+              int l1r, l1g, l1b, l2r, l2g, l2b, l3r, l3g, l3b, l4r, l4g, l4b, l5r, l5g, l5b, l6r, l6g, l6b, l7r, l7g, l7b, l8r, l8g ,l8b, ld, w1f, w2f, pf, pd, ph1f, ph1max, ph1min, ph2f, ph2max, ph2min, vol, w1t, w2t;
+              if (sscanf((const char*)payload, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &l1r, &l1g, &l1b, &l2r, &l2g, &l2b, &l3r, &l3g, &l3b, &l4r, &l4g, &l4b, &l5r, &l5g, &l5b, &l6r, &l6g, &l6b, &l7r, &l7g, &l7b, &l8r, &l8g ,&l8b, &ld,  &w1f, &w2f, &pf, &pd, &ph1f, &ph1max, &ph1min, &ph2f, &ph2max, &ph2min, &vol, &w1t, &w2t) ==  38) { 
                 //setting up the led colors
                 
                 color1 = strip.Color(l1r, l1g, l1b); 
@@ -236,6 +345,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 phasor2_freq=ph2f;
                 phasor2_max=ph2max;
                 phasor2_min=ph2min;
+                wave_1_type=w1t;
+                wave_2_type=w2t;
                 maxivolume=vol / 100.0;
                 maximilian.setVolume(maxivolume);
               }
