@@ -316,8 +316,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
               receive_outputcontrol_data = true;
             };
             if (receive_outputcontrol_data){
-              int l1r, l1g, l1b, l2r, l2g, l2b, l3r, l3g, l3b, l4r, l4g, l4b, l5r, l5g, l5b, l6r, l6g, l6b, l7r, l7g, l7b, l8r, l8g ,l8b, ld, w1f, w2f, pf, pd, ph1f, ph1max, ph1min, ph2f, ph2max, ph2min, vol, w1t, w2t;
-              if (sscanf((const char*)payload, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &l1r, &l1g, &l1b, &l2r, &l2g, &l2b, &l3r, &l3g, &l3b, &l4r, &l4g, &l4b, &l5r, &l5g, &l5b, &l6r, &l6g, &l6b, &l7r, &l7g, &l7b, &l8r, &l8g ,&l8b, &ld,  &w1f, &w2f, &pf, &pd, &ph1f, &ph1max, &ph1min, &ph2f, &ph2max, &ph2min, &vol, &w1t, &w2t) ==  38) { 
+              int l1r, l1g, l1b, l2r, l2g, l2b, l3r, l3g, l3b, l4r, l4g, l4b, l5r, l5g, l5b, l6r, l6g, l6b, l7r, l7g, l7b, l8r, l8g ,l8b, ld, w1f, w2f, pf, pd, ph1f, ph1dif, ph1min, ph2f, ph2dif, ph2min, vol, w1t, w2t;
+              if (sscanf((const char*)payload, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &l1r, &l1g, &l1b, &l2r, &l2g, &l2b, &l3r, &l3g, &l3b, &l4r, &l4g, &l4b, &l5r, &l5g, &l5b, &l6r, &l6g, &l6b, &l7r, &l7g, &l7b, &l8r, &l8g ,&l8b, &ld,  &w1f, &w2f, &pf, &pd, &ph1f, &ph1dif, &ph1min, &ph2f, &ph2dif, &ph2min, &vol, &w1t, &w2t) ==  38) { 
                 //setting up the led colors
                 
                 color1 = strip.Color(l1r, l1g, l1b); 
@@ -339,10 +339,10 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 panner_freq=pf;
                 panner_div=pd;
                 phasor1_freq=ph1f;
-                phasor1_max=ph1max;
+                phasor1_max=ph1min + ph1dif;
                 phasor1_min=ph1min;
                 phasor2_freq=ph2f;
-                phasor2_max=ph2max;
+                phasor2_max=ph2min + ph2dif;
                 phasor2_min=ph2min;
                 wave_1_type=w1t;
                 wave_2_type=w2t;
