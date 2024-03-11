@@ -1,0 +1,640 @@
+import websocket
+import json
+import gym
+from gym import spaces
+import numpy as np
+import re
+import numexpr as ne
+import time
+from collections import OrderedDict
+import plotly.graph_objects as go
+import plotly.subplots as sp
+import plotly
+import json
+import os
+plotly.io.json.config.default_engine = 'orjson'
+websocket.enableTrace(False)
+
+#steps are not implemented for now
+out_dict={'leddelay':{'names':['leddelay'], 'value_range':{'min':1, 'max':10001, 'step':100}, 'init_val':{'leddelay':10}},
+          'ledcontrols':{'names':['lv1r','lv1g','lv1b','lv2r','lv2g','lv2b','lv3r','lv3g','lv3b','lv4r','lv4g','lv4b', 'lv5r','lv5g','lv5b','lv6r','lv6g',
+          'lv6b',
+          'lv7r',
+          'lv7g',
+          'lv7b',
+          'lv8r',
+          'lv8g',
+          'lv8b'], 'value_range':{'min':10, 'max':255, 'step':10}, 'init_val':{'lv1r':255, 'lv1g':0, 'lv1b':0, 
+                                                                               'lv2r':0, 'lv2b':255, 'lv2b':0, 
+                                                                               'lv3r':0, 'lv3g':0, 'lv3b':255, 
+                                                                               'lv4r':255, 'lv4g':255, 'lv4b':255, 
+                                                                               'lv5r':0,   'lv5g':255, 'lv5b':255, 
+                                                                               'lv6r':255, 'lv6g':0,   'lv6b':255, 
+                                                                               'lv7r':255, 'lv7b':255, 'lv7b':0, 
+                                                                               'lv8r':255, 'lv8g':0, 'lv8b':0}},
+          'sound_wave_frequencies':{'names':['wave_1_freq','wave_2_freq'], 'value_range':{'min':1, 'max':30000, 'step':100}, 'init_val':{'wave_1_freq':440, 
+                                                                                                                                         'wave_2_freq':440}},
+          'panner_phasor_frequencies':{'names':['panner_freq', 'phasor_1_freq', 'phasor_2_freq','phasor_1_min',  'phasor_2_min', 'phasor_1_dif', 'phasor_2_dif'],  'value_range':{'min':1, 'max':50, 'step':1},
+                                       'init_val':{'panner_freq':1,
+                                                    'phasor_1_freq':10,
+                                                    'phasor_2_freq':10,
+                                                    'phasor_1_min':1,
+                                                    'phasor_2_min':1,
+                                                    'phasor_1_dif':30,
+                                                    'phasor_2_dif':30}},
+          'panner_div':{'names':['panner_div'], 'value_range':{'min':1, 'max':5, 'step':1}, 'init_val':{'panner_div':2}},
+          'sound_wave_shapes':{'names':['wave_1_type', 'wave_2_type'], 'value_range':{'min':0, 'max':3, 'step':1}, 
+                               'init_val':{'wave_1_type':0,
+                                           'wave_2_type':0}},
+          'maxibolume':{'names':['maxivolume'], 'value_range':{'min':0, 'max':50, 'step':10}, 
+                        'init_val':{'maxivolume':10}}
+}
+out_order=['lv1r','lv1g','lv1b','lv2r','lv2g','lv2b','lv3r','lv3g','lv3b','lv4r','lv4g','lv4b','lv5r','lv5g','lv5b','lv6r','lv6g','lv6b',
+          'lv7r','lv7g','lv7b','lv8r','lv8g','lv8b','leddelay','wave_1_freq','wave_2_freq','panner_freq','panner_div','phasor_1_freq',
+          'phasor_1_min','phasor_1_dif','phasor_2_freq','phasor_2_min','phasor_2_dif','maxivolume','wave_1_type','wave_2_type']
+
+
+class SFSystemCommunicator(gym.Env):
+    def __init__(self, out_dict=out_dict, out_order=out_order,n_input_channels=8, channels_of_interest_inds=list(range(8)), n_timepoints_per_sample=100, max_sfsystem_output=1023,reward_formula_string='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', 
+                 fbins=[(0,1), (1,4), (4,8), (8,12), (12,30)], delay=10,
+                 use_raw_in_os_def=False, use_freq_in_os_def=False, use_fbins_in_os_def=False, device_address="ws://10.42.0.231:80/",
+                 step_stim_length_millis=10000, episode_time_seconds=60, render_data=True, return_plotly_figs=False,
+                 logfn='current_training.log', log_steps=True, log_episodes=True, log_best_actions_final=True, signal_plot_width=2000, signal_plot_height=1500, training_plot_width=2000, training_plot_height=500, 
+                 write_raw=True,
+                 write_fft=True,
+                 write_bins=True,
+                 log_best_actions_every_episode=True,
+                 log_actions_every_step=True,
+                 render_each_step=True):
+        self.device_address=device_address
+        self.step_stim_length=step_stim_length_millis/1000
+        self.episode_time_seconds=episode_time_seconds
+        self.n_steps_per_episode=int(self.episode_time_seconds/self.step_stim_length)
+        self.cur_step=0
+        self.render_data=render_data
+        self.return_plotly_figs=return_plotly_figs
+        
+        self.out_dict=out_dict
+        self.out_order=out_order
+        self.max_sfsystem_output=max_sfsystem_output
+        self.n_timepoints_per_sample=n_timepoints_per_sample
+        self.n_input_channels=n_input_channels
+        self.reward_formula_string=reward_formula_string
+
+        self.delay=delay
+
+        self.record_raw=use_raw_in_os_def
+
+        self.do_fft=use_freq_in_os_def
+        self.record_fft=use_freq_in_os_def
+
+        self.do_fbins=use_fbins_in_os_def
+        self.record_fbins=use_fbins_in_os_def
+
+        self.fbins=fbins
+        self.n_fbins=len(self.fbins)
+
+        self.channels_of_interest_inds=channels_of_interest_inds
+        self.channels_of_interest_inds.sort()
+        self.n_channels_of_interest=len(self.channels_of_interest_inds)
+
+        self.set_fft_params()
+
+        self.timesleep_period=0.1
+
+        if 'raw' in self.reward_formula_string:
+            self.record_raw=True
+        if 'freq' in self.reward_formula_string:
+            self.record_fft=True
+        if 'fbin' in self.reward_formula_string:
+            self.record_fbins=True
+
+        if self.record_fbins:
+            self.do_fft=True
+            self.do_fbins=True
+        
+        self.init_action_space()
+        self.init_observation_space()
+        self.set_value_dict_for_reward_function()
+        self.connect()
+        print(self.connection_status)
+        self.set_delay_and_data_transfer_buffer_size()
+        print('Delay and data transfer buffer size are set up.')
+        self.set_default_actions()
+        print('Default actions are set.')
+
+
+        #logging part
+        self.logfn=logfn
+        if self.render_data==True:
+            self.collect_data_toplot=True
+
+        self.write_raw=write_raw
+        self.write_fft=write_fft
+        self.write_bins=write_bins
+
+
+        self.log_steps=log_steps
+        self.log_episodes=log_episodes
+        
+ 
+        self.clear_reward_buffers()   
+        self.clear_reward_stats()
+        self.current_episode=0
+        self.set_fbin_x_axis_labels()
+        
+        self.create_log()
+        self.signal_plot_width=signal_plot_width
+        self.signal_plot_height=signal_plot_height
+        self.training_plot_width=training_plot_width
+        self.training_plot_height=training_plot_height
+        #action logging
+        self.best_action_overall=None
+        self.best_action_episode=None
+        self.log_actions_every_step=log_actions_every_step
+        self.log_best_actions_every_episode=log_best_actions_every_episode
+        self.log_best_actions_final=log_best_actions_final
+
+        self.render_each_step=render_each_step
+
+        self.done=False
+    def create_log(self):
+        if not os.path.isfile(self.logfn):
+            open(self.logfn, 'a').close()
+    def write_tolog(self, string):
+        with open(self.logfn, 'a') as log_file:
+            log_file.write(string + '\n')
+    def help(self):
+        print('Reward formula can use the following operators: //, *, **, -, +')
+        print('It can refer to channels using "ch" prefix followed by an index (starting with 0) e.g. ch0')
+        print('It can refer to values of frequency bins in specific channels e.g. fbin_10_50_ch0')
+        print('The corresponding freqency bins must be present among fbins passed at the initialization step')
+        print('fbins should be passed in the form of [(b1 min, b1max),...(bn min, bn max)]')
+        print('It can refer to specific frequencies from fft e.g. freq_50_ch0')
+        print('Use integers for frequencies, fractions are not supported for now')
+        print('Some examples:')
+        print('1. (freq_50_ch0+fbin_0_10_ch0)/(fbin_20_30_ch0)')
+        print('2. freq_5_ch0/freq_10_ch0')
+        print('3. fbin_05_5_ch0')
+    def clear_log(self):
+        if os.path.isfile(self.logfn):
+            os.remove(self.logfn)
+    def set_value_dict_for_reward_function(self):
+        ftokens=re.split(r'[+/)(*]+',self.reward_formula_string)
+        self.rewarddict={}
+        self.tokendict={}
+        for token in ftokens:
+            if 'ch' in token:
+                self.rewarddict[token]=None
+                self.tokendict[token]={}
+                subtokens=token.split('_')
+                self.tokendict[token]['datatype']=subtokens[0]
+                for subtoken in subtokens:
+                    if 'ch' in subtoken:
+                        self.tokendict[token]['channelindex']=int(subtoken.split('h')[1])
+                    if subtoken=='freq':
+                        tfreq=float(subtokens[1])
+                        self.tokendict[token]['freqdata']=tfreq
+                        closestind=np.argmin(np.abs(self.f_plot - tfreq))
+                        self.tokendict[token]['closest_fft_ind']=closestind
+                        print(f'Token {token}:')
+                        print(f'Closest fft frequency {self.f_plot[closestind]}')
+                    if subtoken=='fbin':
+                        bin_lst=[subtokens[1],subtokens[2]]
+                        for i in range(2):
+                            val=bin_lst[i]
+                            if val.startswith('0'):
+                                val=float('0.'+val[1:])
+                            else:
+                                val=float(val)
+                            bin_lst[i]=val
+                        self.tokendict[token]['freqdata']=tuple(bin_lst)
+                        self.tokendict[token]['fbin_idx']=self.fbins.index(self.tokendict[token]['freqdata'])
+    def set_default_actions(self):
+        observation_space_sample=self.observation_space.sample()
+        for key1 in observation_space_sample:
+            for key2 in self.out_dict:
+                if key1 in self.out_dict[key2]['init_val']:
+                    observation_space_sample[key2]=self.out_dict[key1]['init_val'][key2]
+
+        self.default_actions=observation_space_sample
+    def populate_rewarddict(self, observations):
+        for token, tokendata in self.tokendict.items():
+            tartype=tokendata['datatype']
+            tarchannelidx=tokendata['channelindex']
+            if tartype=='raw':
+                tarobs=observations['raw_data']
+                tarobs=tarobs[:,tarchannelidx]
+                res=np.mean(tarobs) #here we use the mean, but this may be changed
+            if tartype=='freq':
+                #tarfreq=tokendata['freqdata']
+                taridx=tokendata['closest_fft_ind']
+                tarobs=observations['fft'][tarchannelidx]
+                res=tarobs[taridx]
+            if tartype=='fbin':
+                tarobs=observations['fbins'][tarchannelidx]
+                res=tarobs[tokendata['fbin_idx']]
+            self.rewarddict[token]=res
+    def get_reward(self, observations=None, toreturn=False):
+        if str(observations) != "None":
+            observations=self.observation_space.sample() #if no observations are given extrernally, sample from the observation space
+        self.populate_rewarddict(observations)
+        self.reward=ne.evaluate(self.reward_formula_string, local_dict=self.rewarddict)
+        if toreturn==True:
+            return self.reward
+    def init_action_space(self):
+        self.action_space=spaces.Dict({})
+        for key, val in self.out_dict.items():
+            spacesnames=val['names']
+            spacesrange=val['value_range']
+            for spacename in spacesnames:
+                self.action_space.spaces[spacename]=spaces.Box(low=spacesrange['min'], high=spacesrange['max'], shape=(1,), dtype=int)
+    def init_observation_space(self):
+        self.observation_space=spaces.Dict({})
+        self.observation_space['raw_data']=spaces.Box(low=0, high=self.max_sfsystem_output, shape=(self.n_timepoints_per_sample, self.n_channels_of_interest), dtype=int) #n timepoints per sample rows, n input channels columns, signals should be normalized
+        if self.record_fft:
+            self.observation_space['fft']=spaces.Box(low=0.0, high=1.0, shape=(self.n_channels_of_interest, self.n_fft_values))
+        if self.record_fbins:
+            self.observation_space['fbins']=spaces.Box(low=0.0, high=1.0, shape=(self.n_channels_of_interest, self.n_fbins))
+    def set_fft_params(self):
+        self.sampling_frequency=int(1000/self.delay)
+        self.max_possible_fft_frequency=self.sampling_frequency/2
+        self.sampling_period=int(self.delay*self.n_timepoints_per_sample)
+        self.timesteps=np.linspace(0, (self.n_timepoints_per_sample-1)*self.delay, self.n_timepoints_per_sample)
+        self.fstep=self.sampling_frequency/self.n_timepoints_per_sample
+        self.f=np.linspace(0, (self.n_timepoints_per_sample-1)*self.fstep, self.n_timepoints_per_sample)
+        self.f_plot=self.f[0:int(self.n_timepoints_per_sample/2 + 1)]
+        self.n_fft_values=len(self.f_plot)
+
+    def connect(self):
+        websocket.enableTrace(False)
+        self.ws=websocket.WebSocket()
+        self.ws.connect(self.device_address)
+        self.connection_status=self.ws.recv()
+    
+    def get_fft_fromsignal(self, raw_singlech):
+        X=np.fft.fft(raw_singlech)
+        X_mag=np.abs(X)/self.n_timepoints_per_sample
+        X_mag_plot=2*X_mag[0:int(self.n_timepoints_per_sample/2 + 1)]
+        return X_mag_plot
+
+    def get_fft_allchannels(self, raw_data):
+        if str(raw_data) != "None":
+            raw_data=self.observation_space.sample()['raw_data']
+
+        fft_data=[]
+        for chindex in range(raw_data.shape[1]):
+            chraw=raw_data[:,chindex]
+            chfft=self.get_fft_fromsignal(chraw)
+            fft_data.append(chfft)
+        fft_data=np.array(fft_data)
+        return fft_data
+    
+    def get_bin_values_from_signal(self, fft_signlech):
+        fpl=np.array(self.f_plot)
+        xmp=np.array(fft_signlech)
+        magnitudes=[]
+        for low, high in self.fbins:
+            mask = (fpl >= low) & (fpl < high)
+            magnitude = np.abs(xmp[mask]).mean() #here can be other functions
+            magnitudes.append(magnitude)
+        magnitudes=np.array(magnitudes)
+        if True in np.isnan(magnitudes):
+            print('Warning: nan values among bin values detected!')
+        return magnitudes
+    def set_fbin_x_axis_labels(self):
+        self.fbin_axis_labels=[]
+        for low, high in self.fbins:
+            binname=f'{low}-{high} Hz'
+            self.fbin_axis_labels.append(binname)
+    def get_bin_values_allchannels(self, fft=None):
+        if str(fft) != "None":
+            fft=self.observation_space.sample()['fft']
+        fbins_data=[]
+        for chindex in range(fft.shape[0]):
+            chfft=fft[chindex]
+            chbins=self.get_bin_values_from_signal(chfft)
+            fbins_data.append(chbins)
+        fbins_data=np.array(fbins_data)
+        return fbins_data
+
+    def set_delay_and_data_transfer_buffer_size(self):
+        self.ws.send("set_delay_and_data_transfer_buffer_size")
+        time.sleep(self.timesleep_period)
+        setup=False
+        while setup==False:
+            try:
+                device_msg=self.ws.recv()
+                if device_msg == "Awaiting delay and data transfer buffer size in shape with space separator":
+                    self.ws.send(f'{self.delay},{self.n_timepoints_per_sample}')
+                time.sleep(self.timesleep_period)
+                device_msg=self.ws.recv()
+                if device_msg == "Delay and data transfer buffer size set up":
+                    setup = True 
+                    break;
+            except:
+                pass
+    def start_data_transfer_from_device(self):
+        self.ws.send("start_data_transfer_from_ads")
+    def stop_data_transfer_from_device(self):
+        self.ws.send("stop_data_transfer_from_ads")
+    def stop_audiovis_feedback(self):
+        self.ws.send("stop_led_cycle")
+    def update_audiovis_feedback(self, update_dict=None):
+        if str(update_dict)!= 'None':
+            update_dict=self.action_space.sample()
+        self.ws.send("receive_output_control_data")
+        outmsg_vals=[]
+        for controlnm in self.out_order:
+            outmsg_vals.append(update_dict[controlnm][0])
+        self.current_control_msg=','.join(list(map(str,outmsg_vals)))
+        self.ws.send(self.current_control_msg)
+    def sample_observations(self):
+        self.ws.send("start_data_transfer_from_ads")
+        self.current_sample=json.loads(self.ws.recv())
+        self.raw_data=[]
+        for key, value in self.current_sample.items():
+            self.raw_data.append(value)
+        self.raw_data=np.array(self.raw_data).transpose()
+        self.raw_data=self.raw_data[:,self.channels_of_interest_inds]
+        self.ws.send("stop_data_transfer_from_ads")
+    def sample_and_process_observations_from_device(self):
+        new_observations=dict()
+        self.sample_observations()
+        new_observations['raw_data']=self.raw_data
+        if self.do_fft:
+         self.fft=self.get_fft_allchannels(raw_data=self.raw_data)
+         if self.record_fft:
+            new_observations['fft']=self.fft
+        if self.do_fbins:
+            self.fbins_data=self.get_bin_values_allchannels(fft=self.fft)
+            if self.record_fbins:
+                new_observations['fbins']=self.fbins_data 
+        new_observations=OrderedDict(new_observations)
+        return new_observations
+    def write_signal_logs(self):
+        if self.record_fft==True:
+            if self.write_fft==True:
+                self.write_tolog(json.dumps({'fft':self.cur_observations['fft'].tolist()}))
+        if self.record_fbins==True:
+            if self.write_bins==True:
+                self.write_tolog(json.dumps({'fbins':self.cur_observations['fbins'].tolist()}))
+        if self.record_raw==True:
+            if self.write_raw==True:
+                self.write_tolog(json.dumps({'raw_data':self.cur_observations['raw_data'].tolist()}))
+    def step(self, action):
+        self.done=False
+        self.best_overall_reward_now=False
+        self.best_episode_reward_now=False
+        self.best_total_episode_reward_now=False
+        self.update_audiovis_feedback(action)
+        time.sleep(self.step_stim_length)
+        self.current_actions=action
+        new_observations=self.sample_and_process_observations_from_device()
+        self.cur_observations=new_observations
+        reward=self.get_reward(observations=new_observations, toreturn=True)
+        reward_val=reward.tolist()
+        self.total_cur_episode_reward+=reward_val
+        if reward_val>self.episode_max_reward:
+                self.episode_max_reward=reward_val
+                self.best_episode_reward_now=True
+                self.best_action_episode=action
+        if reward_val>self.overall_max_reward:
+                self.overall_max_reward=reward_val
+                self.best_overall_reward_now=True
+                self.best_action_overall=action
+        if self.total_cur_episode_reward>self.total_episode_max_reward:
+            self.total_episode_max_reward=self.total_cur_episode_reward
+            self.best_total_episode_reward_now=True
+
+        if self.collect_data_toplot:
+            self.cur_episode_rewards.append(reward_val)
+        if self.log_steps:
+            self.write_tolog(json.dumps({'Episode':self.current_episode, 'Step': self.cur_step, 'Step reward': reward_val}))
+        if self.log_actions_every_step:
+            self.write_tolog(json.dumps({'Action reward':reward_val}))
+            actionstring=self.get_json_string_from_ordered_dict(action)
+            self.write_tolog(actionstring)
+        self.write_signal_logs()        
+              
+
+
+        if self.cur_step<self.n_steps_per_episode:
+            self.done=False
+            self.cur_step+=1
+        else:
+            self.done=True
+        if self.render_each_step==True:
+            self.render()
+        return new_observations, reward, self.done, {} #False
+    def reset(self):
+        if self.cur_step>0:
+            if self.done:
+                if self.collect_data_toplot:
+                    self.previous_episodes_total_rewards.append(self.total_cur_episode_reward)
+                    self.previous_episodes_max_rewards.append(self.episode_max_reward)
+                if self.log_episodes:
+                    self.write_tolog(json.dumps({'Episode':self.current_episode, 'Episode total reward': self.total_cur_episode_reward, 'Episode max reward': self.episode_max_reward}))
+                if self.log_best_actions_every_episode:
+                    actionstring=self.get_json_string_from_ordered_dict(self.best_action_episode)
+                    self.write_tolog(json.dumps({'Best action in the episode reward':self.episode_max_reward}))
+                    self.write_tolog(actionstring)
+        self.stop_audiovis_feedback()
+        self.cur_step=0
+        self.episode_max_reward=0
+        self.total_cur_episode_reward=0
+
+        self.done=False
+        self.best_episode_reward_now=False #just in case
+        self.best_overall_reward_now=False #just in case
+        self.best_total_episode_reward_now=False #just in case
+
+        self.best_action_epoch=None
+
+        new_observations=self.sample_and_process_observations_from_device()
+        self.cur_observations=new_observations
+        self.update_audiovis_feedback(update_dict=self.default_actions) #update back to default actions
+        if self.collect_data_toplot==True:
+            self.previous_episodes_max_rewards.append(self.episode_max_reward)
+            self.cur_episode_rewards=[]
+        time.sleep(self.step_stim_length) #prepare the brain for the next episode 
+        return new_observations, {}
+
+    def get_json_string_from_ordered_dict(self, od):
+        od=dict(od)
+        for key, value in od.items():
+            od[key]=value.tolist()
+        return json.dumps(od)
+
+    def render(self, elems=['reward_lineplots', 'current_fft', 'current_fbins'], return_figs=False, jnb=True):
+        if jnb:
+            clear_output(wait=True)
+        if return_figs==None:
+            return_figs=self.return_plotly_figs
+        figures=dict()
+        if 'reward_lineplots' in elems:
+            training_fig=sp.make_subplots(rows=2, cols=2)
+            training_fig.update_layout(width=self.training_plot_width, height = self.training_plot_height)
+            training_fig.add_trace(sp.go.Scatter(x=list(range(len(self.cur_episode_rewards))), y=self.cur_episode_rewards, mode='lines+markers', name='Current episode rewards'), row=1, col=1)
+            training_fig.add_trace(sp.go.Scatter(x=list(range(len(self.previous_episodes_max_rewards))), y=self.previous_episodes_max_rewards, mode='lines+markers', name='Previous episode max rewards'), row=1, col=2)
+            training_fig.add_trace(sp.go.Scatter(x=list(range(len(self.previous_episodes_total_rewards))), y=self.previous_episodes_total_rewards, mode='lines+markers', name='Previous episode total rewards'), row=2, col=1)           
+            figures['reward_lineplots']=training_fig
+            if self.render_data:
+                training_fig.show()
+        if ('current_fft' in elems) or ('current_fbins' in elems):
+            if self.record_fft or self.record_fbins:
+                signal_fig=sp.make_subplots(rows=self.n_channels_of_interest, cols=2)
+                signal_fig.update_layout(width=self.signal_plot_width, height = self.signal_plot_height)
+                if 'current_fft' in elems and self.record_fft:
+                    for chidx in range(self.n_channels_of_interest):
+                        orig_chidx=self.channels_of_interest_inds[chidx]
+                        chfft=self.cur_observations['fft'][chidx]
+                        signal_fig.add_trace(sp.go.Scatter(x=self.f_plot, y=chfft, mode='lines+markers', name=f'Channel {orig_chidx} spectrum'), row=chidx+1, col=1)
+                if 'current_fbins' in elems and self.record_fbins:
+                    for chidx in range(self.n_channels_of_interest):
+                        orig_chidx=self.channels_of_interest_inds[chidx]
+                        chbins=self.cur_observations['fbins'][chidx]
+                        signal_fig.add_trace(sp.go.Bar(x=self.fbin_axis_labels, y=chbins, name=f'Channel {orig_chidx} frequency bins'), row=chidx+1, col=2)
+                if self.render_data:
+                    signal_fig.show()
+        if return_figs:
+            return figures
+    def clear_reward_buffers(self):
+        self.cur_episode_rewards=[]
+        self.previous_episodes_max_rewards=[]
+        self.previous_episodes_total_rewards=[]
+    def clear_reward_stats(self):
+        self.episode_max_reward=0
+        self.overall_max_reward=0
+        self.total_cur_episode_reward=0
+        self.total_episode_max_reward=0
+        self.best_episode_reward_now=False
+        self.best_overall_reward_now=False
+        self.best_total_episode_reward_now=False
+    def close(self, clear_log=False):
+        if self.log_best_actions_final:
+            actionstring=self.get_json_string_from_ordered_dict(self.best_action_overall)
+            self.write_tolog(json.dumps({'Best action across episodes reward':self.overall_max_reward}))
+            self.write_tolog(actionstring)
+        self.stop_audiovis_feedback() #just in case
+        self.stop_data_transfer_from_device() #just in case
+        self.cur_step=0 #just in case
+        self.current_episode=0
+
+        self.clear_reward_buffers()
+        self.clear_reward_stats()
+        if clear_log:
+            self.clear_log()
+        self.ws.close()
+        
+        
+class FlattenActionSpaceWrapper(gym.Wrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        # Flatten the action space
+        self.action_space = self._flatten_action_space(env.action_space)
+
+    def _flatten_action_space(self, original_space):
+        # Calculate the total size of the flattened action space
+        total_size = sum(space.shape[0] for space in original_space.spaces.values())
+        # Create a new Box space with the total size
+        return spaces.Box(low=np.concatenate([space.low for space in original_space.spaces.values()]),
+                            high=np.concatenate([space.high for space in original_space.spaces.values()]),
+                            shape=(total_size,),
+                            dtype=np.int64)
+
+    def step(self, action):
+        # Convert the flattened action back to the original action space format
+        original_action = self._unflatten_action(action)
+        return super().step(original_action)
+
+    def _unflatten_action(self, action):
+        # Split the flattened action into the original spaces
+        original_action = {}
+        start = 0
+        for key, space in self.env.action_space.spaces.items():
+            end = start + space.shape[0]
+            original_action[key] = action[start:end]
+            start = end
+        return original_action
+    
+from stable_baselines3 import A2C
+from stable_baselines3.common.env_checker import check_env
+from gym.wrappers import FlattenObservation
+from stable_baselines3 import PPO, SAC, DDPG, TD3, A2C, DQN
+from IPython.display import clear_output
+
+class stable_baselines_model_trainer():
+    def __init__(self, initialized_environment, algorithm='A2C', policy='MlpPolicy', logfn='model_stats.log', n_steps_per_timestep=1):
+        self.env=initialized_environment
+        self.env = FlattenObservation(self.env)
+        self.env = FlattenActionSpaceWrapper(self.env)
+        self.algorithm=algorithm
+        self.policy=policy
+        self.n_steps_per_timestep=n_steps_per_timestep #for PPO and A2C
+        self.set_model()
+        self.max_test_reward=0
+        self.logfn=logfn
+        if os.path.isfile(self.logfn):
+            os.remove(self.logfn)
+    def set_model(self):
+        if self.algorithm=='PPO':
+            self.model = PPO(self.policy, self.env, n_steps=self.n_steps_per_timestep)
+        if self.algorithm=='SAC':
+            self.model = SAC(self.policy, self.env)
+        if self.algorithm=='DDPG':
+            self.model = DDPG(self.policy, self.env)
+        if self.algorithm=='TD3':
+            self.model = TD3(self.policy, self.env)
+        if self.algorithm=='A2C':
+            self.model = A2C(self.policy, self.env, n_steps=self.n_steps_per_timestep)
+        if self.algorithm=='DQN':
+            self.model = DQN(self.policy, self.env)
+    
+    def close_env(self):
+        self.env.close()
+
+    def train(self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps='episode', log_or_plot_every_n_timesteps=1, jnb=True):
+        if n_total_timesteps=='episode':
+            n_total_timesteps=int(self.env.n_steps_per_episode/self.n_steps_per_timestep) #we run one episode + 1 step before resetting, episode 
+        for i in range(num_episodes):
+            self.cur_n_timesteps=0
+            while self.cur_n_timesteps<int(n_total_timesteps): #here-for A2C
+                self.model.learn(total_timesteps=log_or_plot_every_n_timesteps)
+                self.cur_n_timesteps+=log_or_plot_every_n_timesteps
+                if render_plots:
+                    if get_plots:
+                        self.figs=self.env.render(return_figs=True)
+                    else:
+                        self.env.render()
+                    if jnb:
+                        clear_output(wait=True)
+                if log_model:
+                    if self.env.best_overall_reward_now:
+                        self.model.save("best_overall_reward_model")
+                        with open(self.logfn, 'w') as log_file:
+                            log_file.write(f'target {self.env.reward_formula_string}, current best_overall_reward_model reward {self.env.overall_max_reward}, file best_overall_reward_model' + '\n')
+                    if self.env.best_total_episode_reward_now:
+                        self.model.save("best_total_episode_reward_model")
+                        with open(self.logfn, 'w') as log_file:
+                            log_file.write(f'target {self.env.reward_formula_string}, current best_total_episode_reward_model reward {self.env.total_episode_max_reward}, file best_total_episode_reward_model' + '\n')
+        self.env.stop_audiovis_feedback()            
+#            obs=self.env.reset()[0]
+#            done=False
+#            while not done:
+#                action, _states = self.model.predict(obs, deterministic=True)
+#                obs, reward, done, info = self.env.step(action)
+#                if reward>self.max_test_reward:
+#                    self.max_test_reward=reward
+#                    if log_model:
+#                        self.model.save("best_test_reward_model")
+
+
+        
+        
+        
+
+
+
+
+        
