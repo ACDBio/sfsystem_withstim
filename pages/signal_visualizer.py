@@ -18,7 +18,7 @@ import plotly.graph_objs as go
 from datetime import datetime
 from tqdm.autonotebook import tqdm
 from dash import callback
-
+import dash_bootstrap_components as dbc
 
 import threading
 import queue
@@ -344,8 +344,8 @@ def div_graph_rawheatmap():
     )
 
 def div_graph(name):
-    return html.Div(
-        className="row",
+    return dbc.Row(html.Div(
+       # className="row",
         id=f"div-{name}-graphs_container",
         children=[dcc.Markdown(f'### {" ".join(name.upper().split("_"))}'),
                   div_graph_fastupdate(name),
@@ -354,7 +354,7 @@ def div_graph(name):
                   div_graph_fft(name),
                   div_graph_fft_bar(name),
                   html.Br()],
-        style=invis)
+        style=invis))
 
 def get_time():
     now=datetime.now()
