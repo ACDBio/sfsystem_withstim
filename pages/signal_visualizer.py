@@ -397,6 +397,7 @@ layout = html.Div(children=[
                     WebSocket(url=device_server_address, id="ws"),
                     dcc.Interval(id='logplots_upd_interval', disabled=True, n_intervals=0, max_intervals=1),
                     html.Div(id='message', children=[]),
+                    dcc.Checklist(id='show_message', options=['Show info messages'], value=['Show info messages']),
                     dcc.Store(id='logged_df', data=False),
                     dcc.Store(id='signal_acquistion_options_data', data=None),
 
@@ -725,6 +726,13 @@ layout = html.Div(children=[
                     ])
 ])
 
+@callback(Output('message', 'style'),
+          Input('show_message', 'value'))
+def show_messages(val):
+    if len(val)>0:
+     return vis
+    else:
+        return invis
 
 @callback(Output('bin_description', 'children'),
               Input('frequency_bin_selector','value'),

@@ -14,7 +14,7 @@ navbar = dbc.NavbarSimple(
         nav=True,
         label="Switch usage modes",
     ),
-    brand="SFSystem Client",
+    brand="SF Mule",
     color="BlueViolet",
     dark=True,
     className="mb-2",
