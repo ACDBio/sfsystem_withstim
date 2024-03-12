@@ -105,7 +105,7 @@ layout=html.Div([
                         'Phasor 1 initial frequency span',
                         dcc.RangeSlider(min=1, max=30, step=1, marks=None, value=[1, 50], tooltip={"placement": "bottom", "always_visible": True}, id='phasor_1_span'),
                         html.Div(['Phasor 2 initial frequency: ', 
-                                            dcc.Input(type='number', placeholder='Frequency, Hz', value=440, id='phasor_1_freq')]),
+                                            dcc.Input(type='number', placeholder='Frequency, Hz', value=440, id='phasor_2_freq')]),
                         'Phasor 2 initial frequency span',
                         dcc.RangeSlider(min=1, max=30, step=1, marks=None, value=[1, 50], tooltip={"placement": "bottom", "always_visible": True},id='phasor_2_span'),
                           ]
@@ -234,7 +234,7 @@ def code_wave_shapes(w):
           
               Input('flash_frequency_lb','value'),
               Input('flash_frequency_ub','value'),
-              Input('flash_frequency_ib','value'),
+              Input('flash_frequency_iv','value'),
               Input('rgb_value_range', 'value'),
               Input('l1c','value'),
               Input('l2c','value'),
