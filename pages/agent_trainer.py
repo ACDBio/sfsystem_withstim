@@ -296,7 +296,6 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                               render_data=sd['render_data'],
                                               render_each_step=sd['render_each_step'],
                                               log_actions_every_step=sd['log_actions_every_step'])
-          print('2HERE')
           global trainer
           trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                           algorithm=sd['algorithm'],
