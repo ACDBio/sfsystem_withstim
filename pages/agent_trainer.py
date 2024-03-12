@@ -140,7 +140,7 @@ layout=html.Div([
                 dcc.Markdown('Data processing and usage settings'),  
                 html.Hr(),              
                 'Reward formula: ',
-                dcc.Input(type='text', placeholder='Bin values, Hz', value='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', id='fbins', size='50'),  
+                dcc.Input(type='text', placeholder='Formula string', value='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', id='formula_string', size='50'),  
                 html.Br(),
                 'Observational space data types: ',
                 dcc.Checklist(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Raw signal values','Frequency spectra', 'Frequency bin values'], id='observational_space_datatypes'),
@@ -173,7 +173,7 @@ layout=html.Div([
                 value='A2C',
                 multi=False), 
                 'N steps per timestep (for PPO, A2C): ',
-                dcc.Input(type='number', placeholder='N steps', value=1, id='episode_time_seconds'), 
+                dcc.Input(type='number', placeholder='N steps', value=1, id='n_steps_per_timestep'), 
                 html.Br(),
                 'N timesteps per algorithm training episode: ',
                 dcc.Input(type='number', placeholder='N timesteps', value=0, id='n_total_timesteps'), 
@@ -197,6 +197,10 @@ layout=html.Div([
                 html.Br(),
                 'Logging types: ',
                 dcc.Dropdown(options=['Step data','Episode data', 'Best episode actions', 'Each step actions','Final best actions', 'Raw data','FFT results','Bin values','Models'], value=['Step data','Episode data', 'Best episode actions', 'Each step actions','Final best actions', 'Raw data','FFT results','Bin values','Models'], id='logging_plotting_opts', multi=True), 
+                html.Br(),
+                'Model logging interval in algorithm timesteps: ',
+                dcc.Input(type='text', placeholder='Interval, timesteps', value=1, id='log_or_plot_every_n_timesteps'), 
+                html.Br(),                
                 'Training plot width: ',
                 dcc.Slider(id='training_plot_width',min=500, max=5000, step=100, value=2000, marks=None, tooltip={"placement": "bottom", "always_visible": True, "template": "{value} px"}),
                 'Training plot height: ',
@@ -255,15 +259,35 @@ def code_wave_shapes(w):
               Input('phasor_1_span', 'value'),
               Input('phasor_2_span', 'value'),
               Input('maxivolume','value'),
-
-              
-
+              Input('n_input_channels','value'),
+              Input('channels_of_interest_inds','value'),
+              Input('n_timepoints_per_sample','value'),
+              Input('delay','value'),
+              Input('max_sfsystem_output','value'),
+              Input('formula_string','value'),
+              Input('fbins','value'),
+              Input('device_address','value'),
+              Input('step_stim_length_millis', 'value'),
+              Input('episode_time_seconds','value'),
+              Input('n_total_timesteps','value'),
+              Input('num_episodes', 'value'),
+              Input('logfn', 'value'),
+              Input('logging_plotting_opts', 'value'),
+              Input('log_or_plot_every_n_timesteps', 'value'),
+              Input('algorithm', 'value'),
+              Input('n_steps_per_timestep','value'),
               prevent_initial_call=False)
 def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
                      l1c,l2c,l3c,l4c,l5c,l6c,l7c,l8c,sound_wave_frange,
                      w1f, w2f, w1sh, w2sh, volrange, panner_phasor_frange,panner_freq,
                      panner_div_range,panner_div, phasor_1_freq,phasor_2_freq,phasor_1_span,
-                     phasor_2_span,maxivolume):
+                     phasor_2_span,maxivolume, 
+                     n_input_channels, channels_of_interest_inds,n_timepoints_per_sample,
+                     delay,max_sfsystem_output, formula_string, fbins, device_address,
+                     step_stim_length_millis,episode_time_seconds,n_total_timesteps,
+                     num_episodes,logfn,
+                     logging_plotting_opts,
+                     log_or_plot_every_n_timesteps, algorithm, n_steps_per_timestep):
     ffminf=1000/ffminf #delay = 1000 ms/ n flashes per second
     ffmaxf=1000/ffmaxf
     ffinitf=1000/ffinitf
@@ -275,7 +299,52 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
     w1sh=code_wave_shapes(w1sh)
     w2sh=code_wave_shapes(w2sh)
 
+    session_settings_dict={}
+    session_settings_dict['n_input_channels']=n_input_channels
+    session_settings_dict['channels_of_interest_inds']=channels_of_interest_inds
+    session_settings_dict['n_timepoints_per_sample']=n_timepoints_per_sample
+    session_settings_dict['delay']=delay
+    session_settings_dict['max_sfsystem_output']=max_sfsystem_output
+    session_settings_dict['formula_string']=formula_string
+    binlist=fbins.split(';')
+    fbins=[]
+    for b in binlist:
+        bin=b.split(',')
+        bin=list(map(int, bin))
+        bin=tuple(bin)
+        fbins.append(bin)
+    session_settings_dict['fbins']=fbins
+    session_settings_dict['device_address']=device_address
+    session_settings_dict['step_stim_length_millis']=step_stim_length_millis
+    session_settings_dict['episode_time_seconds']=episode_time_seconds
+    session_settings_dict['n_total_timesteps']=n_total_timesteps
+    session_settings_dict['num_episodes']=num_episodes
+    session_settings_dict['logfn']=logfn
 
+
+
+    for i in logging_plotting_opts:
+        if i=='Step data':
+            session_settings_dict['log_steps']=True
+        if i=='Episode data':
+            session_settings_dict['log_episodes']=True
+        if i=='Best episode actions':
+            session_settings_dict['log_best_actions_every_episode']=True
+        if i=='Each step actions':
+            session_settings_dict['log_actions_every_step']=True
+        if i=='Final best actions':
+            session_settings_dict['log_best_actions_final']=True
+        if i=='Raw data':
+            session_settings_dict['write_raw']=True
+        if i=='FFT results':
+            session_settings_dict['write_fft']=True
+        if i=='Bin values':
+            session_settings_dict['write_bins']=True
+        if i=='Models':
+            session_settings_dict['log_model']=True
+    session_settings_dict['log_or_plot_every_n_timesteps']=log_or_plot_every_n_timesteps
+    session_settings_dict['algorithm']=algorithm
+    session_settings_dict['n_steps_per_timestep']=n_steps_per_timestep
  
     out_dict={'leddelay':{'names':['leddelay'], 'value_range':{'min':ffmaxf, 'max':ffminf}, 'init_val':{'leddelay':ffinitf}},
           'ledcontrols':{'names':['lv1r','lv1g','lv1b','lv2r','lv2g','lv2b','lv3r','lv3g','lv3b','lv4r','lv4g','lv4b', 'lv5r','lv5g','lv5b','lv6r','lv6g',
@@ -313,7 +382,7 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
 
 
 
-    return 
+    return {'out_dict':out_dict, 'session_settings':session_settings_dict}
 
 
 
