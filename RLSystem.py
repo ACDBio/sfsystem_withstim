@@ -636,7 +636,7 @@ class stable_baselines_model_trainer():
                                     log_file.write(f'target {self.env.reward_formula_string}, current best_total_episode_reward_model reward {self.env.total_episode_max_reward}, file best_total_episode_reward_model' + '\n')
                     else:
                         print('Connection stopped.')
-                        return
+                        break
             
             self.env.stop_audiovis_feedback()
             self.training_completed=True     
