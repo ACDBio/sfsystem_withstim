@@ -131,7 +131,10 @@ layout=html.Div([
                 html.Br(), 
                 'Max ADS output: ',
                 dcc.Input(type='number', placeholder='Value', value=1023, id='max_sfsystem_output'),
-                html.Br(),               
+                html.Br(),         
+                'Data types to use in observational space: ',
+                dcc.Dropdown(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Raw signal values','Frequency spectra', 'Frequency bin values'], id='obs_space_opts', multi=True), 
+                html.Br(),                
                 ]
             ),
 
@@ -230,6 +233,68 @@ def code_wave_shapes(w):
     if w=='Triangle':
         return 3
 
+@callback(Output("start_session_train", "children"),
+          Output("start_session_notrain", "children"),
+          Output("start_session_static", "children"),
+          
+          Input("start_session_train", "n_clicks"),
+          Input("start_session_train", 'children'),
+          Input("start_session_notrain", "n_clicks"),
+          Input("start_session_notrain", "children"),
+          Input("start_session_static", "n_clicks"),
+          Input("start_session_static", "children"),
+          State('settings_dictionary', 'data'),
+          prevent_initial_call=True)
+def collect_settings(n_clicks_t, text_t, n_clicks_nt, text_nt, n_clicks_s, text_s, setd):
+    trigger = ctx.triggered[0]
+    trigger_id = trigger['prop_id'].split('.')[0]
+    trigger_value = trigger['value']
+    out_dict=setd['out_dict']
+    sd=setd['session_settings']
+    if trigger_id =='start_session_train':
+        if text_t=="Launch training session":
+          env = RLSystem.SFSystemCommunicator(out_dict=sd['out_dict'],
+                                              n_input_channels=sd['n_input_channels'],
+                                              channels_of_interest_inds=sd['channels_of_interest_inds'],
+                                              n_timepoints_per_sample=sd['n_timepoints_per_sample'],
+                                              max_sfsystem_output=sd['max_sfsystem_output'],
+                                              reward_formula_string=sd['reward_formula_string'],
+                                              fbins=sd['fbins'],
+                                              delay=sd['delay'],
+                                              use_raw_in_os_def=sd['use_raw_in_os_def'],
+                                              use_freq_in_os_def=sd['use_freq_in_os_def'],
+                                              use_fbins_in_os_def=sd['use_fbins_in_os_def'],
+                                              device_address=sd['device_address'],
+                                              step_stim_length_millis=sd['step_stim_length_millis'],
+                                              episode_time_seconds=sd['episode_time_seconds'],
+                                              logfn=sd['logfn'],
+                                              log_steps=sd['log_steps'],
+                                              log_episodes=sd['log_episodes'],
+                                              log_best_actions_final=sd['log_best_actions_final'],
+                                              signal_plot_width=sd['signal_plot_width'],
+                                              signal_plot_height=sd['signal_plot_height'],
+                                              training_plot_width=sd['training_plot_width'],
+                                              training_plot_height=sd['training_plot_height'],
+                                              write_raw=sd['write_raw'],
+                                              write_fft=sd['write_fft'],
+                                              write_bins=sd['write_bins'],
+                                              log_best_actions_every_episode=sd['log_best_actions_every_episode'],
+                                              render_data=sd['render_data'],
+                                              render_each_step=sd['render_each_step'],
+                                              log_actions_every_step=sd['log_actions_every_step'])
+          
+          
+
+
+
+                                              
+      
+
+
+
+
+
+
 @callback(Output('settings_dictionary', 'data'),
           
               Input('flash_frequency_lb','value'),
@@ -276,6 +341,7 @@ def code_wave_shapes(w):
               Input('log_or_plot_every_n_timesteps', 'value'),
               Input('algorithm', 'value'),
               Input('n_steps_per_timestep','value'),
+              Input('obs_space_opts', 'value'),
               prevent_initial_call=False)
 def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
                      l1c,l2c,l3c,l4c,l5c,l6c,l7c,l8c,sound_wave_frange,
@@ -287,7 +353,7 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
                      step_stim_length_millis,episode_time_seconds,n_total_timesteps,
                      num_episodes,logfn,
                      logging_plotting_opts,
-                     log_or_plot_every_n_timesteps, algorithm, n_steps_per_timestep):
+                     log_or_plot_every_n_timesteps, algorithm, n_steps_per_timestep, obs_space_opts):
     ffminf=1000/ffminf #delay = 1000 ms/ n flashes per second
     ffmaxf=1000/ffmaxf
     ffinitf=1000/ffinitf
@@ -345,6 +411,19 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
     session_settings_dict['log_or_plot_every_n_timesteps']=log_or_plot_every_n_timesteps
     session_settings_dict['algorithm']=algorithm
     session_settings_dict['n_steps_per_timestep']=n_steps_per_timestep
+    if 'Raw signal values' in obs_space_opts:
+        session_settings_dict['use_raw_in_os_def']=True
+    else:
+        session_settings_dict['use_raw_in_os_def']=False
+    if 'Frequency spectra' in obs_space_opts:
+        session_settings_dict['use_freq_in_os_def']=True
+    else:
+        session_settings_dict['use_freq_in_os_def']=False
+    if 'Frequency bin values' in obs_space_opts:
+        session_settings_dict['use_fbins_in_os_def']=True
+    else:
+        session_settings_dict['use_fbins_in_os_def']=False
+
  
     out_dict={'leddelay':{'names':['leddelay'], 'value_range':{'min':ffmaxf, 'max':ffminf}, 'init_val':{'leddelay':ffinitf}},
           'ledcontrols':{'names':['lv1r','lv1g','lv1b','lv2r','lv2g','lv2b','lv3r','lv3g','lv3b','lv4r','lv4g','lv4b', 'lv5r','lv5g','lv5b','lv6r','lv6g',
@@ -389,65 +468,5 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-""" {'leddelay':{'names':['leddelay'], 'value_range':{'min':1, 'max':10001, 'step':100}, 'init_val':{'leddelay':10}},
-          'ledcontrols':{'names':['lv1r','lv1g','lv1b','lv2r','lv2g','lv2b','lv3r','lv3g','lv3b','lv4r','lv4g','lv4b', 'lv5r','lv5g','lv5b','lv6r','lv6g',
-          'lv6b',
-          'lv7r',
-          'lv7g',
-          'lv7b',
-          'lv8r',
-          'lv8g',
-          'lv8b'], 'value_range':{'min':10, 'max':255, 'step':10}, 'init_val':{'lv1r':255, 'lv1g':0, 'lv1b':0, 
-                                                                               'lv2r':0, 'lv2b':255, 'lv2b':0, 
-                                                                               'lv3r':0, 'lv3g':0, 'lv3b':255, 
-                                                                               'lv4r':255, 'lv4g':255, 'lv4b':255, 
-                                                                               'lv5r':0,   'lv5g':255, 'lv5b':255, 
-                                                                               'lv6r':255, 'lv6g':0,   'lv6b':255, 
-                                                                               'lv7r':255, 'lv7b':255, 'lv7b':0, 
-                                                                               'lv8r':255, 'lv8g':0, 'lv8b':0}},
-          'sound_wave_frequencies':{'names':['wave_1_freq','wave_2_freq'], 'value_range':{'min':1, 'max':30000, 'step':100}, 'init_val':{'wave_1_freq':440, 
-                                                                                                                                         'wave_2_freq':440}},
-          'panner_phasor_frequencies':{'names':['panner_freq', 'phasor_1_freq', 'phasor_2_freq','phasor_1_min',  'phasor_2_min', 'phasor_1_dif', 'phasor_2_dif'],  'value_range':{'min':1, 'max':50, 'step':1},
-                                       'init_val':{'panner_freq':1,
-                                                    'phasor_1_freq':10,
-                                                    'phasor_2_freq':10,
-                                                    'phasor_1_min':1,
-                                                    'phasor_2_min':1,
-                                                    'phasor_1_dif':30,
-                                                    'phasor_2_dif':30}},
-          'panner_div':{'names':['panner_div'], 'value_range':{'min':1, 'max':5, 'step':1}, 'init_val':{'panner_div':2}},
-          'sound_wave_shapes':{'names':['wave_1_type', 'wave_2_type'], 'value_range':{'min':0, 'max':3, 'step':1}, 
-                               'init_val':{'wave_1_type':0,
-                                           'wave_2_type':0}},
-          'maxibolume':{'names':['maxivolume'], 'value_range':{'min':0, 'max':50, 'step':10}, 
-                        'init_val':{'maxivolume':10}}
-}
-
-self, out_dict=out_dict, out_order=out_order,n_input_channels=8, channels_of_interest_inds=list(range(8)), n_timepoints_per_sample=100, max_sfsystem_output=1023,reward_formula_string='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', 
-                 fbins=[(0,1), (1,4), (4,8), (8,12), (12,30)], delay=10,
-
-                 use_raw_in_os_def=False, use_freq_in_os_def=False, use_fbins_in_os_def=False, device_address="ws://10.42.0.231:80/",
-                 step_stim_length_millis=10000, episode_time_seconds=60, render_data=True, return_plotly_figs=False,
-                 logfn='current_training.log', log_steps=True, log_episodes=True, log_best_actions_final=True, signal_plot_width=2000, signal_plot_height=1500, training_plot_width=2000, training_plot_height=500, 
-                 write_raw=True,
-                 write_fft=True,
-                 write_bins=True,
-                 log_best_actions_every_episode=True,
-                 log_actions_every_step=True,
-                 render_each_step=True """
 
 
