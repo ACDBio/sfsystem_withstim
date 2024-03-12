@@ -4,7 +4,7 @@ import RLSystem
 from dash_extensions.enrich import html, dcc, Input, Output, State, ctx
 dash.register_page(__name__,'/')
 layout=html.Div([
-    dbc.Row(justify="start", children=[dcc.Markdown("Audiovisual space setup"),
+    dbc.Row(justify="start", children=[dcc.Markdown("##### Audiovisual space setup"),
                       html.Hr(),
                       dbc.Col(width='auto',children=[            
             dcc.Markdown("Lighting setup"),
@@ -55,7 +55,7 @@ layout=html.Div([
                     ],)        
                     ]),
         html.Br(),
-        dbc.Row(justify="start", children=[dcc.Markdown("Sound space setup"),
+        dbc.Row(justify="start", children=[dcc.Markdown("##### Sound space setup"),
                       html.Hr(),
                       dbc.Col(width='auto', children=[
                           'Sound wave frequency range',
@@ -100,16 +100,88 @@ layout=html.Div([
                         dcc.RangeSlider(min=1, max=30, step=1, marks=None, value=[1, 50], tooltip={"placement": "bottom", "always_visible": True},id='phasor_2_span'),
                           ]
                         ),
-                      ])
+                      ]),
+          html.Br(),
+          dbc.Row(justify='start', children=[
+            dcc.Markdown('##### Session settings'),
+            html.Hr(),
+            dbc.Col(width='auto', children=[
+            html.Div(children=[
+                'Total channel count: ',
+                dcc.Input(type='number', placeholder='N channels', value=8, id='n_input_channels'),
+                html.Br(),
+                'Channels to observe (indexes, 0-based): ',
+                dcc.Input(type='text', placeholder='Channels of interest idx0,...idxn', value='0,1,2,3,4,5,6,7', id='channels_of_interest_inds'),
+                html.Br(),
+                'N timepoints per sample: ',
+                dcc.Input(type='number', placeholder='N points', value=100, id='n_timepoints_per_sample'),
+                html.Br(),               
+                'Delay between datapoints: ',
+                dcc.Input(type='number', placeholder='Delay, ms', value=10, id='delay'), 
+                html.Br(), 
+                'Max ADS output: ',
+                dcc.Input(type='number', placeholder='Value', value=1023, id='max_sfsystem_output'),
+                html.Br(),               
+                ]
+            ),
+
+            html.Div(children=[
+                html.Br(),
+                dcc.Markdown('Data processing and usage settings'),  
+                html.Hr(),              
+                'Reward formula: ',
+                dcc.Input(type='text', placeholder='Bin values, Hz', value='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', id='fbins', size='50'),  
+                html.Br(),
+                'Observational space data types: ',
+                dcc.Checklist(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Noise','Sine', 'Square', 'Triangle'], id='observational_space_datatypes'),
+                html.Br(),
+                'Frequency bins to record: ',
+                dcc.Input(type='text', placeholder='Bin values, Hz', value='0,1;1,4;4,8;8,12;12,30', id='fbins'),   
+                html.Br(),
+                'Device address: ',
+                dcc.Input(type='text', placeholder='Bin values, Hz', value='ws://10.42.0.231:80/', id='device_address'),  
+            ]),]),
+
+            dbc.Col(width='auto', children=[
+                dcc.Markdown('Session timings'),  
+                html.Hr(),
+                'Step length, ms (approximate): ',
+                dcc.Input(type='number', placeholder='Length, ms', value=10000, id='step_stim_length_millis'),  
+                html.Br(),
+                'Episode time (approximate): ',
+                dcc.Input(type='number', placeholder='Length, ms', value=60, id='episode_time_seconds'), 
+                html.Br(),
+                html.Br(),
+                dcc.Markdown('RL training settings'),
+                html.Hr(),
+                'Rl algorithm: ',
+                dcc.Dropdown(id='algorithm',
+                options=['PPO','SAC','DDPG','TD3','A2C','DQN'],
+                value='A2C',
+                multi=False), 
+                'N steps per timestep (for PPO, A2C): ',
+                dcc.Input(type='number', placeholder='N steps', value=1, id='episode_time_seconds'), 
+                html.Br(),
+                'N timesteps per algorithm training episode: ',
+                dcc.Input(type='number', placeholder='N timesteps', value=0, id='n_total_timesteps'), 
+                html.Br(),
+                '(to use the step count corresponding to the episode time set 0)',
+                html.Br(),
+                'N episodes: ',
+                dcc.Input(type='number', placeholder='N episodes', value=5, id='num_episodes'), 
+            ])
+
+
+
+          ]),
                       
                       
                       
                       
-                      
-                      
+                         
 ]),
 
-            
+            #self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps='episode', log_or_plot_every_n_timesteps=1, jnb=True
 
 
 
@@ -150,6 +222,7 @@ layout=html.Div([
 
 self, out_dict=out_dict, out_order=out_order,n_input_channels=8, channels_of_interest_inds=list(range(8)), n_timepoints_per_sample=100, max_sfsystem_output=1023,reward_formula_string='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', 
                  fbins=[(0,1), (1,4), (4,8), (8,12), (12,30)], delay=10,
+
                  use_raw_in_os_def=False, use_freq_in_os_def=False, use_fbins_in_os_def=False, device_address="ws://10.42.0.231:80/",
                  step_stim_length_millis=10000, episode_time_seconds=60, render_data=True, return_plotly_figs=False,
                  logfn='current_training.log', log_steps=True, log_episodes=True, log_best_actions_final=True, signal_plot_width=2000, signal_plot_height=1500, training_plot_width=2000, training_plot_height=500, 
