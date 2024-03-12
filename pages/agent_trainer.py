@@ -1,6 +1,6 @@
 import dash
 import dash_bootstrap_components as dbc
-import RLSystem
+from RLSystem import SFSystemCommunicator, stable_baselines_model_trainer
 from dash_extensions.enrich import html, dcc, Input, Output, State, ctx
 from dash import callback
 
@@ -14,6 +14,7 @@ b_invis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 
 
 layout=html.Div([
     dcc.Store(id='settings_dictionary',data=None),
+    dcc.Interval(id='training_status_update', disabled=True, n_intervals=0, max_intervals=1),
     dbc.Row(justify="start", children=[dcc.Markdown("##### Audiovisual space setup"),
                       html.Hr(),
                       dbc.Col(width='auto',children=[            
@@ -203,6 +204,8 @@ layout=html.Div([
                 html.Br(),
                 'Model logging interval in algorithm timesteps: ',
                 dcc.Input(type='text', placeholder='Interval, timesteps', value=1, id='log_or_plot_every_n_timesteps'), 
+                html.Br(),
+                dcc.Checklist(options=['Render session plots'], value=['Render session plots'], id='render_data'),
                 html.Br(),                
                 'Training plot width: ',
                 dcc.Slider(id='training_plot_width',min=500, max=5000, step=100, value=2000, marks=None, tooltip={"placement": "bottom", "always_visible": True, "template": "{value} px"}),
@@ -219,9 +222,12 @@ layout=html.Div([
             ' ',
             html.Button("Launch dynamic session without training", id="start_session_notrain", style=b_vis, n_clicks=0),
             ' ',
-            html.Button("Launch static session with current settings", id="start_session_static", style=b_vis, n_clicks=0),])
-          ]),                                        
-]),
+            html.Button("Launch static session with current settings", id="start_session_static", style=b_vis, n_clicks=0),
+            ' ',
+            html.Button("Stop training", id="stop_session_train", style=b_invis, n_clicks=0),
+            ' ',
+            html.Button("Run additional episodes", id="additional_session", style=b_invis, n_clicks=0) ])])
+          ])                                        
 
 def code_wave_shapes(w):
     if w=='Noise':
@@ -233,27 +239,35 @@ def code_wave_shapes(w):
     if w=='Triangle':
         return 3
 
-@callback(Output("start_session_train", "children"),
-          Output("start_session_notrain", "children"),
-          Output("start_session_static", "children"),
+@callback(Output("start_session_train", "style"),
+          Output("start_session_notrain", "style"),
+          Output("start_session_static", "style"),
+          Output("stop_session_train", "style"),
+          Output("additional_session", "style"),
+
+
           
           Input("start_session_train", "n_clicks"),
-          Input("start_session_train", 'children'),
           Input("start_session_notrain", "n_clicks"),
-          Input("start_session_notrain", "children"),
           Input("start_session_static", "n_clicks"),
-          Input("start_session_static", "children"),
+          Input("stop_session_train", "n_clicks"),
+          Input("additional_session", "n_clicks"),
+
+
+
           State('settings_dictionary', 'data'),
           prevent_initial_call=True)
-def collect_settings(n_clicks_t, text_t, n_clicks_nt, text_nt, n_clicks_s, text_s, setd):
+def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, setd):
     trigger = ctx.triggered[0]
     trigger_id = trigger['prop_id'].split('.')[0]
     trigger_value = trigger['value']
     out_dict=setd['out_dict']
     sd=setd['session_settings']
     if trigger_id =='start_session_train':
-        if text_t=="Launch training session":
-          env = RLSystem.SFSystemCommunicator(out_dict=sd['out_dict'],
+          print(sd)
+          print(out_dict)
+          global env
+          env = SFSystemCommunicator(out_dict=out_dict,
                                               n_input_channels=sd['n_input_channels'],
                                               channels_of_interest_inds=sd['channels_of_interest_inds'],
                                               n_timepoints_per_sample=sd['n_timepoints_per_sample'],
@@ -282,7 +296,23 @@ def collect_settings(n_clicks_t, text_t, n_clicks_nt, text_nt, n_clicks_s, text_
                                               render_data=sd['render_data'],
                                               render_each_step=sd['render_each_step'],
                                               log_actions_every_step=sd['log_actions_every_step'])
+          print('2HERE')
+          global trainer
+          trainer=stable_baselines_model_trainer(initialized_environment=env,
+                                                          algorithm=sd['algorithm'],
+                                                          policy='MlpPolicy',
+                                                          logfn='model_stats.log',
+                                                          n_steps_per_timestep=sd['n_steps_per_timestep'])
+          trainer.train(num_episodes=sd['num_episodes'], log_model=sd['log_model'],n_total_timesteps=sd['n_total_timesteps'],
+                        log_or_plot_every_n_timesteps=sd['log_or_plot_every_n_timesteps'], jnb=False)
+          return b_invis, b_invis, b_invis, b_vis, b_vis
           
+
+          
+
+
+
+         
           
 
 
@@ -342,6 +372,11 @@ def collect_settings(n_clicks_t, text_t, n_clicks_nt, text_nt, n_clicks_s, text_
               Input('algorithm', 'value'),
               Input('n_steps_per_timestep','value'),
               Input('obs_space_opts', 'value'),
+              Input('signal_plot_width', 'value'),
+              Input('signal_plot_height', 'value'),
+              Input('training_plot_width', 'value'),
+              Input('training_plot_height', 'value'),
+              Input('render_data','value'),
               prevent_initial_call=False)
 def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
                      l1c,l2c,l3c,l4c,l5c,l6c,l7c,l8c,sound_wave_frange,
@@ -353,7 +388,8 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
                      step_stim_length_millis,episode_time_seconds,n_total_timesteps,
                      num_episodes,logfn,
                      logging_plotting_opts,
-                     log_or_plot_every_n_timesteps, algorithm, n_steps_per_timestep, obs_space_opts):
+                     log_or_plot_every_n_timesteps, algorithm, n_steps_per_timestep, obs_space_opts,
+                     signal_plot_width, signal_plot_height,training_plot_width,training_plot_height, render_data):
     ffminf=1000/ffminf #delay = 1000 ms/ n flashes per second
     ffmaxf=1000/ffmaxf
     ffinitf=1000/ffinitf
@@ -364,14 +400,14 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
     
     w1sh=code_wave_shapes(w1sh)
     w2sh=code_wave_shapes(w2sh)
-
+    
     session_settings_dict={}
     session_settings_dict['n_input_channels']=n_input_channels
-    session_settings_dict['channels_of_interest_inds']=channels_of_interest_inds
+    session_settings_dict['channels_of_interest_inds']=list(map(int, channels_of_interest_inds.split(',')))
     session_settings_dict['n_timepoints_per_sample']=n_timepoints_per_sample
     session_settings_dict['delay']=delay
     session_settings_dict['max_sfsystem_output']=max_sfsystem_output
-    session_settings_dict['formula_string']=formula_string
+    session_settings_dict['reward_formula_string']=formula_string
     binlist=fbins.split(';')
     fbins=[]
     for b in binlist:
@@ -386,8 +422,15 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
     session_settings_dict['n_total_timesteps']=n_total_timesteps
     session_settings_dict['num_episodes']=num_episodes
     session_settings_dict['logfn']=logfn
-
-
+    session_settings_dict['signal_plot_width']=signal_plot_width
+    session_settings_dict['signal_plot_height']=signal_plot_height
+    session_settings_dict['training_plot_width']=training_plot_width
+    session_settings_dict['training_plot_height']=training_plot_height
+    session_settings_dict['render_each_step']=True #no control, by default
+    if len(render_data)>0:
+        session_settings_dict['render_data']=True
+    else:
+        session_settings_dict['render_data']=False
 
     for i in logging_plotting_opts:
         if i=='Step data':
@@ -455,7 +498,7 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
           'sound_wave_shapes':{'names':['wave_1_type', 'wave_2_type'], 'value_range':{'min':0, 'max':3}, 
                                'init_val':{'wave_1_type':w1sh,
                                            'wave_2_type':w2sh}},
-          'maxibolume':{'names':['maxivolume'], 'value_range':{'min':volrange[0], 'max':volrange[1]}, 
+          'maxivolume':{'names':['maxivolume'], 'value_range':{'min':volrange[0], 'max':volrange[1]}, 
                         'init_val':{'maxivolume':maxivolume}}
 }
 

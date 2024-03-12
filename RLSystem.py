@@ -46,7 +46,7 @@ out_dict={'leddelay':{'names':['leddelay'], 'value_range':{'min':1, 'max':10001,
           'sound_wave_shapes':{'names':['wave_1_type', 'wave_2_type'], 'value_range':{'min':0, 'max':3, 'step':1}, 
                                'init_val':{'wave_1_type':0,
                                            'wave_2_type':0}},
-          'maxibolume':{'names':['maxivolume'], 'value_range':{'min':0, 'max':50, 'step':10}, 
+          'maxivolume':{'names':['maxivolume'], 'value_range':{'min':0, 'max':50, 'step':10}, 
                         'init_val':{'maxivolume':10}}
 }
 out_order=['lv1r','lv1g','lv1b','lv2r','lv2g','lv2b','lv3r','lv3g','lv3b','lv4r','lv4g','lv4b','lv5r','lv5g','lv5b','lv6r','lv6g','lv6b',
@@ -90,7 +90,12 @@ class SFSystemCommunicator(gym.Env):
 
         self.do_fbins=use_fbins_in_os_def
         self.record_fbins=use_fbins_in_os_def
-
+        
+        binlist=fbins
+        fbins=[]
+        for b in binlist:
+            bin=tuple(b)
+            fbins.append(bin)
         self.fbins=fbins
         self.n_fbins=len(self.fbins)
 
