@@ -77,9 +77,9 @@ layout=html.Div([
                         'Sound wave shapes',
                         #dcc.Checklist(options=['Noise','Sine', 'Square', 'Triangle'], value=['Noise','Sine', 'Square', 'Triangle'], id='sound_wave_shapes'),
                         html.Div(['Wave 1 initial shape: ', 
-                                            dcc.RadioItems(['Noise','Sine', 'Square', 'Triangle'], 'Noise')]),
+                                            dcc.RadioItems(['Noise','Sine', 'Square', 'Triangle'], 'Noise', id='w1sh')]),
                         html.Div(['Wave 2 initial shape: ', 
-                                            dcc.RadioItems(['Noise','Sine', 'Square', 'Triangle'], 'Noise')]),
+                                            dcc.RadioItems(['Noise','Sine', 'Square', 'Triangle'], 'Noise', id='w2sh')]),
                         html.Hr(),
                         'Volume range',
                         dcc.RangeSlider(min=0, max=50, step=1, marks=None, value=[1, 25], tooltip={"placement": "bottom", "always_visible": True},id='volume_range'),
@@ -216,13 +216,104 @@ layout=html.Div([
           ]),                                        
 ]),
 
+def code_wave_shapes(w):
+    if w=='Noise':
+        return 0
+    if w=='Sine':
+        return 1
+    if w=='Square':
+        return 2
+    if w=='Triangle':
+        return 3
 
 @callback(Output('settings_dictionary', 'data'),
+          
               Input('flash_frequency_lb','value'),
+              Input('flash_frequency_ub','value'),
+              Input('flash_frequency_ib','value'),
+              Input('rgb_value_range', 'value'),
+              Input('l1c','value'),
+              Input('l2c','value'),
+              Input('l3c','value'),
+              Input('l4c','value'),
+              Input('l5c','value'),
+              Input('l6c','value'),
+              Input('l7c','value'),
+              Input('l8c','value'),
+              Input('sound_wave_frange','value'),
+              Input('wave_1_freq','value'),
+              Input('wave_2_freq','value'),
+              Input('w1sh','value'),
+              Input('w2sh','value'),
+              Input('volume_range', 'value'),
+              Input('panner_phasor_frange', 'value'),
+              Input('panner_freq', 'value'),
+              Input('panner_div_range', 'value'),
+              Input('panner_div', 'value'),
+              Input('phasor_1_freq', 'value'),
+              Input('phasor_2_freq', 'value'),
+              Input('phasor_1_span', 'value'),
+              Input('phasor_2_span', 'value'),
+              Input('maxivolume','value'),
+
+              
+
               prevent_initial_call=False)
-def collect_settings(val): 
+def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
+                     l1c,l2c,l3c,l4c,l5c,l6c,l7c,l8c,sound_wave_frange,
+                     w1f, w2f, w1sh, w2sh, volrange, panner_phasor_frange,panner_freq,
+                     panner_div_range,panner_div, phasor_1_freq,phasor_2_freq,phasor_1_span,
+                     phasor_2_span,maxivolume):
+    ffminf=1000/ffminf #delay = 1000 ms/ n flashes per second
+    ffmaxf=1000/ffmaxf
+    ffinitf=1000/ffinitf
+    lvals=[]
+    for v in [l1c,l2c,l3c,l4c,l5c,l6c,l7c,l8c]:
+        vals=list(map(int, v.split(',')))
+        lvals+=vals
     
-    return
+    w1sh=code_wave_shapes(w1sh)
+    w2sh=code_wave_shapes(w2sh)
+
+
+ 
+    out_dict={'leddelay':{'names':['leddelay'], 'value_range':{'min':ffmaxf, 'max':ffminf}, 'init_val':{'leddelay':ffinitf}},
+          'ledcontrols':{'names':['lv1r','lv1g','lv1b','lv2r','lv2g','lv2b','lv3r','lv3g','lv3b','lv4r','lv4g','lv4b', 'lv5r','lv5g','lv5b','lv6r','lv6g',
+          'lv6b',
+          'lv7r',
+          'lv7g',
+          'lv7b',
+          'lv8r',
+          'lv8g',
+          'lv8b'], 'value_range':{'min':rgbrange[0], 'max':rgbrange[1]}, 'init_val':{'lv1r':lvals[0], 'lv1g':lvals[1], 'lv1b':lvals[2], 
+                                                                               'lv2r':lvals[3], 'lv2b':lvals[4], 'lv2b':lvals[5], 
+                                                                               'lv3r':lvals[6], 'lv3g':lvals[7], 'lv3b':lvals[8], 
+                                                                               'lv4r':lvals[9], 'lv4g':lvals[10], 'lv4b':lvals[11], 
+                                                                               'lv5r':lvals[12],   'lv5g':lvals[13], 'lv5b':lvals[14], 
+                                                                               'lv6r':lvals[15], 'lv6g':lvals[16],   'lv6b':lvals[17], 
+                                                                               'lv7r':lvals[18], 'lv7b':lvals[19], 'lv7b':lvals[20], 
+                                                                               'lv8r':lvals[21], 'lv8g':lvals[22], 'lv8b':lvals[23]}},
+          'sound_wave_frequencies':{'names':['wave_1_freq','wave_2_freq'], 'value_range':{'min':sound_wave_frange[0], 'max':sound_wave_frange[1]}, 'init_val':{'wave_1_freq':w1f, 
+                                                                                                                                         'wave_2_freq':w2f}},
+          'panner_phasor_frequencies':{'names':['panner_freq', 'phasor_1_freq', 'phasor_2_freq','phasor_1_min',  'phasor_2_min', 'phasor_1_dif', 'phasor_2_dif'],  'value_range':{'min':panner_phasor_frange[0], 'max':panner_phasor_frange[1]},
+                                       'init_val':{'panner_freq':panner_freq,
+                                                    'phasor_1_freq':phasor_1_freq,
+                                                    'phasor_2_freq':phasor_2_freq,
+                                                    'phasor_1_min':phasor_1_span[0],
+                                                    'phasor_2_min':phasor_2_span[0],
+                                                    'phasor_1_dif':phasor_1_span[1]-phasor_1_span[0],
+                                                    'phasor_2_dif':phasor_2_span[1]-phasor_2_span[0]}},
+          'panner_div':{'names':['panner_div'], 'value_range':{'min':panner_div_range[0], 'max':panner_div_range[1]}, 'init_val':{'panner_div':panner_div}},
+          'sound_wave_shapes':{'names':['wave_1_type', 'wave_2_type'], 'value_range':{'min':0, 'max':3}, 
+                               'init_val':{'wave_1_type':w1sh,
+                                           'wave_2_type':w2sh}},
+          'maxibolume':{'names':['maxivolume'], 'value_range':{'min':volrange[0], 'max':volrange[1]}, 
+                        'init_val':{'maxivolume':maxivolume}}
+}
+
+
+
+    return 
 
 
 
