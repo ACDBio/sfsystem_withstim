@@ -2,6 +2,8 @@ import dash
 import dash_bootstrap_components as dbc
 import RLSystem
 from dash_extensions.enrich import html, dcc, Input, Output, State, ctx
+from dash import callback
+
 dash.register_page(__name__,'/')
 
 #invis={'display':'none'}
@@ -11,6 +13,7 @@ b_vis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'd
 b_invis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'none'}
 
 layout=html.Div([
+    dcc.Store(id='settings_dictionary',data=None),
     dbc.Row(justify="start", children=[dcc.Markdown("##### Audiovisual space setup"),
                       html.Hr(),
                       dbc.Col(width='auto',children=[            
@@ -193,7 +196,7 @@ layout=html.Div([
                 dcc.Input(type='text', placeholder='filename.log', value='current_training.log', id='logfn'), 
                 html.Br(),
                 'Logging types: ',
-                dcc.Dropdown(options=['Step data','Episode data', 'Best episode actions', 'Each step actions','Best actions final', 'Raw data','FFT results','Bin values','Models'], value=['Step data','Episode data', 'Best episode actions', 'Each step actions','Best actions final', 'Raw data','FFT results','Bin values','Models'], id='logging_plotting_opts', multi=True), 
+                dcc.Dropdown(options=['Step data','Episode data', 'Best episode actions', 'Each step actions','Final best actions', 'Raw data','FFT results','Bin values','Models'], value=['Step data','Episode data', 'Best episode actions', 'Each step actions','Final best actions', 'Raw data','FFT results','Bin values','Models'], id='logging_plotting_opts', multi=True), 
                 'Training plot width: ',
                 dcc.Slider(id='training_plot_width',min=500, max=5000, step=100, value=2000, marks=None, tooltip={"placement": "bottom", "always_visible": True, "template": "{value} px"}),
                 'Training plot height: ',
@@ -214,7 +217,12 @@ layout=html.Div([
 ]),
 
 
-
+@callback(Output('settings_dictionary', 'data'),
+              Input('flash_frequency_lb','value'),
+              prevent_initial_call=False)
+def collect_settings(val): 
+    
+    return
 
 
 
