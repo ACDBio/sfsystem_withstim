@@ -268,7 +268,6 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
     if trigger_id =='start_session_train':
           #print(sd)
           #print(out_dict)
-          stop_training=False
           env = SFSystemCommunicator(out_dict=out_dict,
                                               n_input_channels=sd['n_input_channels'],
                                               channels_of_interest_inds=sd['channels_of_interest_inds'],
@@ -315,7 +314,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
               
           }
           #print(training_args)
-          training_thread = threading.Thread(target=start_training, args=(training_args,stop_training))
+          training_thread = threading.Thread(target=start_training, args=(training_args,))
           training_thread.daemon = True
           training_thread.start()
           return b_invis, b_invis, b_invis, b_vis, b_vis
@@ -330,14 +329,15 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
 
 
          
-def start_training(sd, stop_training):
+def start_training(sd):
     global env
     global trainer
+    try:
+        trainer.train(num_episodes=sd['num_episodes'], log_model=sd['log_model'],n_total_timesteps=sd['n_total_timesteps'],
+                            log_or_plot_every_n_timesteps=sd['log_or_plot_every_n_timesteps'], jnb=False)
 
-    trainer.train(num_episodes=sd['num_episodes'], log_model=sd['log_model'],n_total_timesteps=sd['n_total_timesteps'],
-                        log_or_plot_every_n_timesteps=sd['log_or_plot_every_n_timesteps'], jnb=False)
-
-
+    except Exception as e:
+        print(f"Thread terminated: {e}")
 
                                               
       
