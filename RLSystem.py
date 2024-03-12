@@ -429,8 +429,8 @@ class SFSystemCommunicator(gym.Env):
             self.cur_step+=1
         else:
             self.done=True
-        if self.render_each_step==True:
-            self.render()
+        #if self.render_each_step==True:
+        #    self.render()
         return new_observations, reward, self.done, {} #False
     def reset(self):
         if self.cur_step>0:

@@ -3,6 +3,7 @@ import dash_bootstrap_components as dbc
 from RLSystem import SFSystemCommunicator, stable_baselines_model_trainer
 from dash_extensions.enrich import html, dcc, Input, Output, State, ctx
 from dash import callback
+import threading
 
 dash.register_page(__name__,'/')
 
@@ -264,8 +265,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
     out_dict=setd['out_dict']
     sd=setd['session_settings']
     if trigger_id =='start_session_train':
-          print(sd)
-          print(out_dict)
+          #print(sd)
+          #print(out_dict)
           global env
           env = SFSystemCommunicator(out_dict=out_dict,
                                               n_input_channels=sd['n_input_channels'],
@@ -296,14 +297,28 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                               render_data=sd['render_data'],
                                               render_each_step=sd['render_each_step'],
                                               log_actions_every_step=sd['log_actions_every_step'])
+          #env.step(env.action_space.sample()) #sample step
           global trainer
           trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                           algorithm=sd['algorithm'],
                                                           policy='MlpPolicy',
                                                           logfn='model_stats.log',
                                                           n_steps_per_timestep=sd['n_steps_per_timestep'])
-          trainer.train(num_episodes=sd['num_episodes'], log_model=sd['log_model'],n_total_timesteps=sd['n_total_timesteps'],
-                        log_or_plot_every_n_timesteps=sd['log_or_plot_every_n_timesteps'], jnb=False)
+          
+
+
+          training_args={
+              'num_episodes':sd['num_episodes'],
+              'log_model':sd['log_model'],
+              'n_total_timesteps':sd['n_total_timesteps'],
+              'log_or_plot_every_n_timesteps':sd['log_or_plot_every_n_timesteps'],
+              'jnb':False
+              
+          }
+          print(training_args)
+          training_thread = threading.Thread(target=start_training, args=(training_args,))
+          #training_thread.daemon = True
+          training_thread.start()
           return b_invis, b_invis, b_invis, b_vis, b_vis
           
 
@@ -312,7 +327,13 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
 
 
          
-          
+def start_training(sd):
+    # For example:
+    global env
+    global trainer
+    # Initialize env and trainer as before
+    trainer.train(num_episodes=sd['num_episodes'], log_model=sd['log_model'],n_total_timesteps=sd['n_total_timesteps'],
+                 log_or_plot_every_n_timesteps=sd['log_or_plot_every_n_timesteps'], jnb=False)
 
 
 
@@ -418,6 +439,9 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
     session_settings_dict['device_address']=device_address
     session_settings_dict['step_stim_length_millis']=step_stim_length_millis
     session_settings_dict['episode_time_seconds']=episode_time_seconds
+
+    if n_total_timesteps==0:
+        n_total_timesteps='episode'
     session_settings_dict['n_total_timesteps']=n_total_timesteps
     session_settings_dict['num_episodes']=num_episodes
     session_settings_dict['logfn']=logfn
