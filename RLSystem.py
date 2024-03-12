@@ -389,50 +389,55 @@ class SFSystemCommunicator(gym.Env):
             if self.write_raw==True:
                 self.write_tolog(json.dumps({'raw_data':self.cur_observations['raw_data'].tolist()}))
     def step(self, action):
-        self.done=False
-        self.best_overall_reward_now=False
-        self.best_episode_reward_now=False
-        self.best_total_episode_reward_now=False
-        self.update_audiovis_feedback(action)
-        time.sleep(self.step_stim_length)
-        self.current_actions=action
-        new_observations=self.sample_and_process_observations_from_device()
-        self.cur_observations=new_observations
-        reward=self.get_reward(observations=new_observations, toreturn=True)
-        reward_val=reward.tolist()
-        self.total_cur_episode_reward+=reward_val
-        if reward_val>self.episode_max_reward:
-                self.episode_max_reward=reward_val
-                self.best_episode_reward_now=True
-                self.best_action_episode=action
-        if reward_val>self.overall_max_reward:
-                self.overall_max_reward=reward_val
-                self.best_overall_reward_now=True
-                self.best_action_overall=action
-        if self.total_cur_episode_reward>self.total_episode_max_reward:
-            self.total_episode_max_reward=self.total_cur_episode_reward
-            self.best_total_episode_reward_now=True
-
-        if self.collect_data_toplot:
-            self.cur_episode_rewards.append(reward_val)
-        if self.log_steps:
-            self.write_tolog(json.dumps({'Episode':self.current_episode, 'Step': self.cur_step, 'Step reward': reward_val}))
-        if self.log_actions_every_step:
-            self.write_tolog(json.dumps({'Action reward':reward_val}))
-            actionstring=self.get_json_string_from_ordered_dict(action)
-            self.write_tolog(actionstring)
-        self.write_signal_logs()        
-              
-
-
-        if self.cur_step<self.n_steps_per_episode:
+        if self.ws.sock is not None:
             self.done=False
-            self.cur_step+=1
+            self.best_overall_reward_now=False
+            self.best_episode_reward_now=False
+            self.best_total_episode_reward_now=False
+            self.update_audiovis_feedback(action)
+            time.sleep(self.step_stim_length)
+            self.current_actions=action
+            new_observations=self.sample_and_process_observations_from_device()
+            self.cur_observations=new_observations
+            reward=self.get_reward(observations=new_observations, toreturn=True)
+            reward_val=reward.tolist()
+            self.reward_cur=reward
+            self.total_cur_episode_reward+=reward_val
+            if reward_val>self.episode_max_reward:
+                    self.episode_max_reward=reward_val
+                    self.best_episode_reward_now=True
+                    self.best_action_episode=action
+            if reward_val>self.overall_max_reward:
+                    self.overall_max_reward=reward_val
+                    self.best_overall_reward_now=True
+                    self.best_action_overall=action
+            if self.total_cur_episode_reward>self.total_episode_max_reward:
+                self.total_episode_max_reward=self.total_cur_episode_reward
+                self.best_total_episode_reward_now=True
+
+            if self.collect_data_toplot:
+                self.cur_episode_rewards.append(reward_val)
+            if self.log_steps:
+                self.write_tolog(json.dumps({'Episode':self.current_episode, 'Step': self.cur_step, 'Step reward': reward_val}))
+            if self.log_actions_every_step:
+                self.write_tolog(json.dumps({'Action reward':reward_val}))
+                actionstring=self.get_json_string_from_ordered_dict(action)
+                self.write_tolog(actionstring)
+            self.write_signal_logs()        
+                
+
+
+            if self.cur_step<self.n_steps_per_episode:
+                self.done=False
+                self.cur_step+=1
+            else:
+                self.done=True
+            #if self.render_each_step==True:
+            #    self.render()
+            return new_observations, reward, self.done, {} #False
         else:
-            self.done=True
-        #if self.render_each_step==True:
-        #    self.render()
-        return new_observations, reward, self.done, {} #False
+            print('No connection')
+            return
     def reset(self):
         if self.cur_step>0:
             if self.done:
@@ -532,7 +537,8 @@ class SFSystemCommunicator(gym.Env):
         self.clear_reward_stats()
         if clear_log:
             self.clear_log()
-        self.ws.close()
+        if self.ws.sock is not None:
+            self.ws.close()
         
         
 class FlattenActionSpaceWrapper(gym.Wrapper):
@@ -602,32 +608,42 @@ class stable_baselines_model_trainer():
         self.env.close()
 
     def train(self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps='episode', log_or_plot_every_n_timesteps=1, jnb=True):
-        self.training_completed=False
-        if n_total_timesteps=='episode':
-            n_total_timesteps=int(self.env.n_steps_per_episode/self.n_steps_per_timestep) #we run one episode + 1 step before resetting, episode 
-        for i in range(num_episodes):
-            self.cur_n_timesteps=0
-            while self.cur_n_timesteps<int(n_total_timesteps): #here-for A2C
-                self.model.learn(total_timesteps=log_or_plot_every_n_timesteps)
-                self.cur_n_timesteps+=log_or_plot_every_n_timesteps
-                if render_plots:
-                    if get_plots:
-                        self.figs=self.env.render(return_figs=True)
+        if self.env.ws.sock is not None:
+            self.training_completed=False
+            if n_total_timesteps=='episode':
+                n_total_timesteps=int(self.env.n_steps_per_episode/self.n_steps_per_timestep) #we run one episode + 1 step before resetting, episode 
+            for i in range(num_episodes):
+                self.cur_n_timesteps=0
+                while self.cur_n_timesteps<int(n_total_timesteps): #here-for A2C
+                    if self.env.ws.sock is not None:
+                        self.model.learn(total_timesteps=log_or_plot_every_n_timesteps)
+                        self.cur_n_timesteps+=log_or_plot_every_n_timesteps
+                        if render_plots:
+                            if get_plots:
+                                self.figs=self.env.render(return_figs=True)
+                            else:
+                                self.env.render()
+                            if jnb:
+                                clear_output(wait=True)
+                        if log_model:
+                            if self.env.best_overall_reward_now:
+                                self.model.save("best_overall_reward_model")
+                                with open(self.logfn, 'w') as log_file:
+                                    log_file.write(f'target {self.env.reward_formula_string}, current best_overall_reward_model reward {self.env.overall_max_reward}, file best_overall_reward_model' + '\n')
+                            if self.env.best_total_episode_reward_now:
+                                self.model.save("best_total_episode_reward_model")
+                                with open(self.logfn, 'w') as log_file:
+                                    log_file.write(f'target {self.env.reward_formula_string}, current best_total_episode_reward_model reward {self.env.total_episode_max_reward}, file best_total_episode_reward_model' + '\n')
                     else:
-                        self.env.render()
-                    if jnb:
-                        clear_output(wait=True)
-                if log_model:
-                    if self.env.best_overall_reward_now:
-                        self.model.save("best_overall_reward_model")
-                        with open(self.logfn, 'w') as log_file:
-                            log_file.write(f'target {self.env.reward_formula_string}, current best_overall_reward_model reward {self.env.overall_max_reward}, file best_overall_reward_model' + '\n')
-                    if self.env.best_total_episode_reward_now:
-                        self.model.save("best_total_episode_reward_model")
-                        with open(self.logfn, 'w') as log_file:
-                            log_file.write(f'target {self.env.reward_formula_string}, current best_total_episode_reward_model reward {self.env.total_episode_max_reward}, file best_total_episode_reward_model' + '\n')
-        self.env.stop_audiovis_feedback()
-        self.training_completed=True            
+                        print('Connection stopped.')
+                        return
+            
+            self.env.stop_audiovis_feedback()
+            self.training_completed=True     
+            return     
+        else:
+            print('No connection.')
+            return  
 #            obs=self.env.reset()[0]
 #            done=False
 #            while not done:

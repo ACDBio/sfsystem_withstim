@@ -12,7 +12,6 @@ dash.register_page(__name__,'/')
 #d_vis={'color': 'Black', 'font-size': 20}
 b_vis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'inline-block'}
 b_invis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'none'}
-
 layout=html.Div([
     dcc.Store(id='settings_dictionary',data=None),
     dcc.Interval(id='training_status_update', disabled=True, n_intervals=0, max_intervals=1),
@@ -269,6 +268,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
     if trigger_id =='start_session_train':
           #print(sd)
           #print(out_dict)
+          stop_training=False
           env = SFSystemCommunicator(out_dict=out_dict,
                                               n_input_channels=sd['n_input_channels'],
                                               channels_of_interest_inds=sd['channels_of_interest_inds'],
@@ -306,7 +306,6 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                           n_steps_per_timestep=sd['n_steps_per_timestep'])
           
 
-
           training_args={
               'num_episodes':sd['num_episodes'],
               'log_model':sd['log_model'],
@@ -316,12 +315,11 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
               
           }
           #print(training_args)
-          training_thread = threading.Thread(target=start_training, args=(training_args,))
+          training_thread = threading.Thread(target=start_training, args=(training_args,stop_training))
           training_thread.daemon = True
           training_thread.start()
           return b_invis, b_invis, b_invis, b_vis, b_vis
     if trigger_id=="stop_session_train":
-        print("INTHE CORRECT")
         trainer.close_env()
         return b_vis, b_vis, b_vis, b_invis, b_invis
 
@@ -332,12 +330,12 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
 
 
          
-def start_training(sd):
+def start_training(sd, stop_training):
     global env
     global trainer
 
     trainer.train(num_episodes=sd['num_episodes'], log_model=sd['log_model'],n_total_timesteps=sd['n_total_timesteps'],
-                    log_or_plot_every_n_timesteps=sd['log_or_plot_every_n_timesteps'], jnb=False)
+                        log_or_plot_every_n_timesteps=sd['log_or_plot_every_n_timesteps'], jnb=False)
 
 
 
