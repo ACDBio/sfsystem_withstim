@@ -163,6 +163,7 @@ class SFSystemCommunicator(gym.Env):
         self.render_each_step=render_each_step
 
         self.done=False
+        self.training_completed=False
     def create_log(self):
         if not os.path.isfile(self.logfn):
             open(self.logfn, 'a').close()
@@ -518,9 +519,10 @@ class SFSystemCommunicator(gym.Env):
         self.best_total_episode_reward_now=False
     def close(self, clear_log=False):
         if self.log_best_actions_final:
-            actionstring=self.get_json_string_from_ordered_dict(self.best_action_overall)
-            self.write_tolog(json.dumps({'Best action across episodes reward':self.overall_max_reward}))
-            self.write_tolog(actionstring)
+            if str(self.best_action_overall) != 'None':
+                actionstring=self.get_json_string_from_ordered_dict(self.best_action_overall)
+                self.write_tolog(json.dumps({'Best action across episodes reward':self.overall_max_reward}))
+                self.write_tolog(actionstring)
         self.stop_audiovis_feedback() #just in case
         self.stop_data_transfer_from_device() #just in case
         self.cur_step=0 #just in case
@@ -600,6 +602,7 @@ class stable_baselines_model_trainer():
         self.env.close()
 
     def train(self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps='episode', log_or_plot_every_n_timesteps=1, jnb=True):
+        self.training_completed=False
         if n_total_timesteps=='episode':
             n_total_timesteps=int(self.env.n_steps_per_episode/self.n_steps_per_timestep) #we run one episode + 1 step before resetting, episode 
         for i in range(num_episodes):
@@ -623,7 +626,8 @@ class stable_baselines_model_trainer():
                         self.model.save("best_total_episode_reward_model")
                         with open(self.logfn, 'w') as log_file:
                             log_file.write(f'target {self.env.reward_formula_string}, current best_total_episode_reward_model reward {self.env.total_episode_max_reward}, file best_total_episode_reward_model' + '\n')
-        self.env.stop_audiovis_feedback()            
+        self.env.stop_audiovis_feedback()
+        self.training_completed=True            
 #            obs=self.env.reset()[0]
 #            done=False
 #            while not done:

@@ -259,6 +259,8 @@ def code_wave_shapes(w):
           State('settings_dictionary', 'data'),
           prevent_initial_call=True)
 def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, setd):
+    global env
+    global trainer
     trigger = ctx.triggered[0]
     trigger_id = trigger['prop_id'].split('.')[0]
     trigger_value = trigger['value']
@@ -267,7 +269,6 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
     if trigger_id =='start_session_train':
           #print(sd)
           #print(out_dict)
-          global env
           env = SFSystemCommunicator(out_dict=out_dict,
                                               n_input_channels=sd['n_input_channels'],
                                               channels_of_interest_inds=sd['channels_of_interest_inds'],
@@ -298,7 +299,6 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                               render_each_step=sd['render_each_step'],
                                               log_actions_every_step=sd['log_actions_every_step'])
           #env.step(env.action_space.sample()) #sample step
-          global trainer
           trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                           algorithm=sd['algorithm'],
                                                           policy='MlpPolicy',
@@ -315,11 +315,16 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
               'jnb':False
               
           }
-          print(training_args)
+          #print(training_args)
           training_thread = threading.Thread(target=start_training, args=(training_args,))
-          #training_thread.daemon = True
+          training_thread.daemon = True
           training_thread.start()
           return b_invis, b_invis, b_invis, b_vis, b_vis
+    if trigger_id=="stop_session_train":
+        print("INTHE CORRECT")
+        trainer.close_env()
+        return b_vis, b_vis, b_vis, b_invis, b_invis
+
           
 
           
@@ -328,12 +333,11 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
 
          
 def start_training(sd):
-    # For example:
     global env
     global trainer
-    # Initialize env and trainer as before
+
     trainer.train(num_episodes=sd['num_episodes'], log_model=sd['log_model'],n_total_timesteps=sd['n_total_timesteps'],
-                 log_or_plot_every_n_timesteps=sd['log_or_plot_every_n_timesteps'], jnb=False)
+                    log_or_plot_every_n_timesteps=sd['log_or_plot_every_n_timesteps'], jnb=False)
 
 
 
