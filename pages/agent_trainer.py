@@ -3,6 +3,13 @@ import dash_bootstrap_components as dbc
 import RLSystem
 from dash_extensions.enrich import html, dcc, Input, Output, State, ctx
 dash.register_page(__name__,'/')
+
+#invis={'display':'none'}
+#vis={'display':'inline-block'}
+#d_vis={'color': 'Black', 'font-size': 20}
+b_vis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'inline-block'}
+b_invis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'none'}
+
 layout=html.Div([
     dbc.Row(justify="start", children=[dcc.Markdown("##### Audiovisual space setup"),
                       html.Hr(),
@@ -133,14 +140,17 @@ layout=html.Div([
                 dcc.Input(type='text', placeholder='Bin values, Hz', value='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', id='fbins', size='50'),  
                 html.Br(),
                 'Observational space data types: ',
-                dcc.Checklist(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Noise','Sine', 'Square', 'Triangle'], id='observational_space_datatypes'),
+                dcc.Checklist(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Raw signal values','Frequency spectra', 'Frequency bin values'], id='observational_space_datatypes'),
                 html.Br(),
                 'Frequency bins to record: ',
                 dcc.Input(type='text', placeholder='Bin values, Hz', value='0,1;1,4;4,8;8,12;12,30', id='fbins'),   
                 html.Br(),
                 'Device address: ',
                 dcc.Input(type='text', placeholder='Bin values, Hz', value='ws://10.42.0.231:80/', id='device_address'),  
-            ]),]),
+                
+            ]),
+            html.Br(),
+            ]),
 
             dbc.Col(width='auto', children=[
                 dcc.Markdown('Session timings'),  
@@ -169,19 +179,58 @@ layout=html.Div([
                 html.Br(),
                 'N episodes: ',
                 dcc.Input(type='number', placeholder='N episodes', value=5, id='num_episodes'), 
-            ])
+                html.Br(),
 
 
-
-          ]),
-                      
-                      
-                      
-                      
-                         
+            ]),
+            html.Br(),
+            html.Br(),
+            dbc.Row(justify='start', children=[
+                dbc.Col(width='auto',children=[
+                dcc.Markdown('##### Logging and visualization'),
+                html.Hr(),
+                'General logging file name: ',
+                dcc.Input(type='text', placeholder='filename.log', value='current_training.log', id='logfn'), 
+                html.Br(),
+                'Logging types: ',
+                dcc.Dropdown(options=['Step data','Episode data', 'Best episode actions', 'Each step actions','Best actions final', 'Raw data','FFT results','Bin values','Models'], value=['Step data','Episode data', 'Best episode actions', 'Each step actions','Best actions final', 'Raw data','FFT results','Bin values','Models'], id='logging_plotting_opts', multi=True), 
+                'Training plot width: ',
+                dcc.Slider(id='training_plot_width',min=500, max=5000, step=100, value=2000, marks=None, tooltip={"placement": "bottom", "always_visible": True, "template": "{value} px"}),
+                'Training plot height: ',
+                dcc.Slider(id='training_plot_height',min=50, max=5000, step=50, value=500, marks=None, tooltip={"placement": "bottom", "always_visible": True, "template": "{value} px"}),                
+                'Signal plot width: ',
+                dcc.Slider(id='signal_plot_width',min=500, max=5000, step=100, value=2000, marks=None, tooltip={"placement": "bottom", "always_visible": True, "template": "{value} px"}),  
+                'Signal plot height: ',
+                dcc.Slider(id='signal_plot_height',min=50, max=5000, step=50, value=1500, marks=None, tooltip={"placement": "bottom", "always_visible": True, "template": "{value} px"}),                  
+                ])             
+            ]),
+            html.Div(children=[
+            html.Button("Launch training session", id="start_session_train", style=b_vis, n_clicks=0),
+            ' ',
+            html.Button("Launch dynamic session without training", id="start_session_notrain", style=b_vis, n_clicks=0),
+            ' ',
+            html.Button("Launch static session with current settings", id="start_session_static", style=b_vis, n_clicks=0),])
+          ]),                                        
 ]),
 
-            #self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps='episode', log_or_plot_every_n_timesteps=1, jnb=True
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
