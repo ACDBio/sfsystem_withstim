@@ -164,6 +164,7 @@ class SFSystemCommunicator(gym.Env):
 
         self.done=False
         self.training_completed=False
+        self.figures={'signal_fig':[],'training_fig':[]}
     def create_log(self):
         if not os.path.isfile(self.logfn):
             open(self.logfn, 'a').close()
@@ -432,8 +433,8 @@ class SFSystemCommunicator(gym.Env):
                 self.cur_step+=1
             else:
                 self.done=True
-            #if self.render_each_step==True:
-            #    self.render()
+            if self.render_each_step==True:
+                self.render()
             return new_observations, reward, self.done, {} #False
         else:
             print('No connection')
@@ -477,21 +478,21 @@ class SFSystemCommunicator(gym.Env):
             od[key]=value.tolist()
         return json.dumps(od)
 
-    def render(self, elems=['reward_lineplots', 'current_fft', 'current_fbins'], return_figs=False, jnb=True):
+    def render(self, elems=['reward_lineplots', 'current_fft', 'current_fbins'], return_figs=False, jnb=False, collect_figs=True):
         if jnb:
             clear_output(wait=True)
         if return_figs==None:
             return_figs=self.return_plotly_figs
-        figures=dict()
         if 'reward_lineplots' in elems:
             training_fig=sp.make_subplots(rows=2, cols=2)
             training_fig.update_layout(width=self.training_plot_width, height = self.training_plot_height)
             training_fig.add_trace(sp.go.Scatter(x=list(range(len(self.cur_episode_rewards))), y=self.cur_episode_rewards, mode='lines+markers', name='Current episode rewards'), row=1, col=1)
             training_fig.add_trace(sp.go.Scatter(x=list(range(len(self.previous_episodes_max_rewards))), y=self.previous_episodes_max_rewards, mode='lines+markers', name='Previous episode max rewards'), row=1, col=2)
             training_fig.add_trace(sp.go.Scatter(x=list(range(len(self.previous_episodes_total_rewards))), y=self.previous_episodes_total_rewards, mode='lines+markers', name='Previous episode total rewards'), row=2, col=1)           
-            figures['reward_lineplots']=training_fig
+            self.figures['training_fig']=training_fig
             if self.render_data:
-                training_fig.show()
+                if jnb==True:
+                    training_fig.show()
         if ('current_fft' in elems) or ('current_fbins' in elems):
             if self.record_fft or self.record_fbins:
                 signal_fig=sp.make_subplots(rows=self.n_channels_of_interest, cols=2)
@@ -507,9 +508,12 @@ class SFSystemCommunicator(gym.Env):
                         chbins=self.cur_observations['fbins'][chidx]
                         signal_fig.add_trace(sp.go.Bar(x=self.fbin_axis_labels, y=chbins, name=f'Channel {orig_chidx} frequency bins'), row=chidx+1, col=2)
                 if self.render_data:
-                    signal_fig.show()
+                    if jnb==True:
+                        signal_fig.show()
+                self.figures['signal_fig']=signal_fig
+
         if return_figs:
-            return figures
+            return self.figures
     def clear_reward_buffers(self):
         self.cur_episode_rewards=[]
         self.previous_episodes_max_rewards=[]

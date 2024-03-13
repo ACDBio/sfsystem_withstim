@@ -218,8 +218,8 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
                 ])             
             ]),
             html.Br(),
-            'Session data update minimal interval: ',
-            dcc.Input(type='number', placeholder='interval, ms', value=1000, id='info_upd_interval'), 
+            html.Div(children=['Session data update minimal interval: ',
+            dcc.Input(type='number', placeholder='interval, ms', value=1000, id='info_upd_interval', size=30),]), 
             html.Div(children=[
             html.Button("Launch training session", id="start_session_train", style=b_vis, n_clicks=0),
             ' ',
@@ -232,7 +232,13 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
             html.Button("Run additional episodes", id="additional_session", style=b_invis, n_clicks=0) ])])
 ]),
 dbc.Col(children=[dcc.Markdown("### Session Data"),
-                  html.Div(id='training_figure_container', children=[])])]      
+                  html.Div(id='training_figure_container', children=[]),
+                  html.Br(),
+                  html.Div(id='signal_figure_container', children=[]),
+                  html.Br(),
+                  
+                  
+                  ])]      
           
 )
           ])                                        
@@ -248,10 +254,21 @@ def code_wave_shapes(w):
         return 3
     
 @callback(Output('training_figure_container', "children"),
+          Output('signal_figure_container', "children"),
           Input('training_status_update', 'n_intervals'),
           prevent_initial_call=True)
 def collect_settings(n_intervals):
     global env
+    #print(env.figures)
+
+    training_fig=dcc.Graph(id=f'training_figure',
+                    figure=env.figures['training_fig'],
+                    config={'staticPlot': False},)
+    signal_fig=dcc.Graph(id=f'training_figure',
+                    figure=env.figures['signal_fig'],
+                    config={'staticPlot': False},)
+                    
+    return training_fig, signal_fig
 
 
 
