@@ -12,9 +12,9 @@ dash.register_page(__name__,'/')
 #d_vis={'color': 'Black', 'font-size': 20}
 b_vis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'inline-block'}
 b_invis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'none'}
-layout=html.Div([
+layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
     dcc.Store(id='settings_dictionary',data=None),
-    dcc.Interval(id='training_status_update', disabled=True, n_intervals=0, max_intervals=1),
+    dcc.Interval(id='training_status_update', disabled=True, n_intervals=0, max_intervals=-1),
     dbc.Row(justify="start", children=[dcc.Markdown("##### Audiovisual space setup"),
                       html.Hr(),
                       dbc.Col(width='auto',children=[            
@@ -217,6 +217,9 @@ layout=html.Div([
                 dcc.Slider(id='signal_plot_height',min=50, max=5000, step=50, value=1500, marks=None, tooltip={"placement": "bottom", "always_visible": True, "template": "{value} px"}),                  
                 ])             
             ]),
+            html.Br(),
+            'Session data update minimal interval: ',
+            dcc.Input(type='number', placeholder='interval, ms', value=1000, id='info_upd_interval'), 
             html.Div(children=[
             html.Button("Launch training session", id="start_session_train", style=b_vis, n_clicks=0),
             ' ',
@@ -227,6 +230,11 @@ layout=html.Div([
             html.Button("Stop training", id="stop_session_train", style=b_invis, n_clicks=0),
             ' ',
             html.Button("Run additional episodes", id="additional_session", style=b_invis, n_clicks=0) ])])
+]),
+dbc.Col(children=[dcc.Markdown("### Session Data"),
+                  html.Div(id='training_figure_container', children=[])])]      
+          
+)
           ])                                        
 
 def code_wave_shapes(w):
@@ -238,13 +246,23 @@ def code_wave_shapes(w):
         return 2
     if w=='Triangle':
         return 3
+    
+@callback(Output('training_figure_container', "children"),
+          Input('training_status_update', 'n_intervals'),
+          prevent_initial_call=True)
+def collect_settings(n_intervals):
+    global env
+
+
+
 
 @callback(Output("start_session_train", "style"),
           Output("start_session_notrain", "style"),
           Output("start_session_static", "style"),
           Output("stop_session_train", "style"),
           Output("additional_session", "style"),
-
+          Output('training_status_update', 'disabled'),
+          Output('training_status_update', 'interval'),
 
           
           Input("start_session_train", "n_clicks"),
@@ -256,8 +274,9 @@ def code_wave_shapes(w):
 
 
           State('settings_dictionary', 'data'),
+          State('info_upd_interval', 'value'), 
           prevent_initial_call=True)
-def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, setd):
+def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, setd, info_upd_interval):
     global env
     global trainer
     trigger = ctx.triggered[0]
@@ -317,10 +336,10 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
           training_thread = threading.Thread(target=start_training, args=(training_args,))
           training_thread.daemon = True
           training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval
     if trigger_id=="stop_session_train":
         trainer.close_env()
-        return b_vis, b_vis, b_vis, b_invis, b_invis
+        return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval
 
           
 
@@ -337,7 +356,7 @@ def start_training(sd):
                             log_or_plot_every_n_timesteps=sd['log_or_plot_every_n_timesteps'], jnb=False)
 
     except Exception as e:
-        print(f"Thread terminated: {e}")
+        print(f"Training thread terminated: {e}")
 
                                               
       
@@ -411,7 +430,8 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
                      num_episodes,logfn,
                      logging_plotting_opts,
                      log_or_plot_every_n_timesteps, algorithm, n_steps_per_timestep, obs_space_opts,
-                     signal_plot_width, signal_plot_height,training_plot_width,training_plot_height, render_data):
+                     signal_plot_width, signal_plot_height,training_plot_width,training_plot_height, render_data,
+                     ):
     ffminf=1000/ffminf #delay = 1000 ms/ n flashes per second
     ffmaxf=1000/ffmaxf
     ffinitf=1000/ffinitf
