@@ -90,8 +90,11 @@ class SFSystemCommunicator(gym.Env):
                  log_best_actions_every_episode=True,
                  log_actions_every_step=True,
                  render_each_step=True,
-                 colors=color_names):
+                 colors=color_names, 
+                 stim_length_on_reset=10):
         self.colors=colors
+        self.stim_length_on_reset=stim_length_on_reset
+
         self.device_address=device_address
         self.step_stim_length=step_stim_length_millis/1000
         self.episode_time_seconds=episode_time_seconds
@@ -490,7 +493,6 @@ class SFSystemCommunicator(gym.Env):
     def reset(self):
         if self.cur_step>0:
             if self.done:
-                print('HERE')
                 if self.collect_data_toplot:
                     self.previous_episodes_total_rewards.append(self.total_cur_episode_reward)
                     self.previous_episodes_max_rewards.append(self.episode_max_reward)
@@ -514,13 +516,15 @@ class SFSystemCommunicator(gym.Env):
 
 
         self.update_audiovis_feedback(update_dict=self.default_actions) #update back to default actions
-        new_observations=self.sample_and_process_observations_from_device()
-        self.cur_observations=new_observations
+        
+        
         if self.collect_data_toplot==True:
             self.previous_episodes_max_rewards.append(self.episode_max_reward)
             self.cur_episode_rewards=[]
             
-        time.sleep(self.step_stim_length) #prepare the brain for the next episode 
+        time.sleep(self.stim_length_on_reset) #prepare the brain for the next episode 
+        new_observations=self.sample_and_process_observations_from_device() #sampling new observations after reset
+        self.cur_observations=new_observations
         return new_observations, {}
 
     def get_json_string_from_ordered_dict(self, od):
@@ -529,8 +533,9 @@ class SFSystemCommunicator(gym.Env):
             od[key]=value.tolist()
         return json.dumps(od)
 
-    def render(self, elems=['reward_lineplots', 'current_fft', 'current_fbins'], return_figs=False, jnb=False):
-
+    def render(self, elems=['reward_lineplots', 'current_fft', 'current_fbins'], return_figs=False, jnb=False, colors=None):
+        if str(colors)=='None':
+            colors=self.colors
         if jnb:
             clear_output(wait=True)
         if return_figs==None:
@@ -551,13 +556,13 @@ class SFSystemCommunicator(gym.Env):
                 signal_fig.update_layout(width=self.signal_plot_width, height = self.signal_plot_height)
                 if 'current_fft' in elems and self.record_fft:
                     for chidx in range(self.n_channels_of_interest):
-                        color=self.colors[chidx]
+                        color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
                         chfft=self.cur_observations['fft'][chidx]
                         signal_fig.add_trace(sp.go.Scatter(x=self.f_plot, y=chfft, mode='lines+markers', name=f'Channel {orig_chidx} spectrum', line=dict(color=color)), row=chidx+1, col=1)
                 if 'current_fbins' in elems and self.record_fbins:
                     for chidx in range(self.n_channels_of_interest):
-                        color=self.colors[chidx]
+                        color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
                         chbins=self.cur_observations['fbins'][chidx]
                         signal_fig.add_trace(sp.go.Bar(x=self.fbin_axis_labels, y=chbins, name=f'Channel {orig_chidx} frequency bins', marker=dict(color=color)), row=chidx+1, col=2)

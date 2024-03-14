@@ -4,6 +4,8 @@ from RLSystem import SFSystemCommunicator, stable_baselines_model_trainer
 from dash_extensions.enrich import html, dcc, Input, Output, State, ctx
 from dash import callback
 import threading
+import webcolors
+import random
 
 dash.register_page(__name__,'/')
 
@@ -232,6 +234,15 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
             html.Button("Run additional episodes", id="additional_session", style=b_invis, n_clicks=0) ])])
 ]),
 dbc.Col(children=[dcc.Markdown("### Session Data"),
+                 html.Div(id='plot_style_container', children=[
+                'CSS color names for the signal plots: ',
+                dcc.Input(type='text', placeholder='CSS color name', value='black', id='signal_plot_color'), 
+                html.Br(),
+                'Use "random,seed" for a random color sample',
+                html.Br(),
+                html.Button("Resample colors", id="color_resample", style=b_vis, n_clicks=0)
+                 ]),
+                  html.Br(),
                   html.Div(id='training_figure_container', children=[]),
                   html.Br(),
                   html.Div(id='signal_figure_container', children=[]),
@@ -242,6 +253,25 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
           
 )
           ])                                        
+
+def get_random_css_color_names(n, seed=333):
+    """
+    Returns a list of n different CSS color names.
+    
+    Args:
+    - n: The number of different color names to retrieve.
+    
+    Returns:
+    - A list of n different CSS color names.
+    """
+    # Get the list of all CSS color names
+    css_color_names = list(webcolors.CSS3_HEX_TO_NAMES.values())
+    
+    random.seed(seed)
+    # Randomly select n different color names
+    random_color_names = random.sample(css_color_names, n)
+    
+    return random_color_names
 
 def code_wave_shapes(w):
     if w=='Noise':
@@ -292,8 +322,9 @@ def collect_settings(n_intervals):
 
           State('settings_dictionary', 'data'),
           State('info_upd_interval', 'value'), 
+          State('signal_plot_color','value'),
           prevent_initial_call=True)
-def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, setd, info_upd_interval):
+def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, setd, info_upd_interval, sigplot_color):
     global env
     global trainer
     trigger = ctx.triggered[0]
@@ -301,6 +332,10 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
     trigger_value = trigger['value']
     out_dict=setd['out_dict']
     sd=setd['session_settings']
+    if sigplot_color.split(',')[0]=='random':
+        sigplot_colors=get_random_css_color_names(sd['n_input_channels'], seed=int(sigplot_color.split(',')[1]))
+    else:
+        sigplot_colors=[sigplot_color for i in range(sd['n_input_channels'])]
     if trigger_id =='start_session_train':
           #print(sd)
           #print(out_dict)
@@ -332,7 +367,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                               log_best_actions_every_episode=sd['log_best_actions_every_episode'],
                                               render_data=sd['render_data'],
                                               render_each_step=sd['render_each_step'],
-                                              log_actions_every_step=sd['log_actions_every_step'])
+                                              log_actions_every_step=sd['log_actions_every_step'],
+                                              colors=sigplot_colors)
           #env.step(env.action_space.sample()) #sample step
           trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                           algorithm=sd['algorithm'],
