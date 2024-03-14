@@ -218,13 +218,16 @@ class SFSystemCommunicator(gym.Env):
                         self.tokendict[token]['freqdata']=tuple(bin_lst)
                         self.tokendict[token]['fbin_idx']=self.fbins.index(self.tokendict[token]['freqdata'])
     def set_default_actions(self):
-        observation_space_sample=self.observation_space.sample()
-        for key1 in observation_space_sample:
+        action_space_sample=self.action_space.sample()
+        for key1 in action_space_sample:
             for key2 in self.out_dict:
                 if key1 in self.out_dict[key2]['init_val']:
-                    observation_space_sample[key2]=self.out_dict[key1]['init_val'][key2]
+                    val=self.out_dict[key2]['init_val'][key1]
+                    if str(type(val))=="<class 'int'>":
+                        val=np.array([val]) 
+                    action_space_sample[key1]=val
 
-        self.default_actions=observation_space_sample
+        self.default_actions=action_space_sample
     def populate_rewarddict(self, observations):
         for token, tokendata in self.tokendict.items():
             tartype=tokendata['datatype']
@@ -243,7 +246,7 @@ class SFSystemCommunicator(gym.Env):
                 res=tarobs[tokendata['fbin_idx']]
             self.rewarddict[token]=res
     def get_reward(self, observations=None, toreturn=False):
-        if str(observations) != "None":
+        if str(observations) == "None":
             observations=self.observation_space.sample() #if no observations are given extrernally, sample from the observation space
         self.populate_rewarddict(observations)
         self.reward=ne.evaluate(self.reward_formula_string, local_dict=self.rewarddict)
@@ -267,7 +270,8 @@ class SFSystemCommunicator(gym.Env):
         self.sampling_frequency=int(1000/self.delay)
         self.max_possible_fft_frequency=self.sampling_frequency/2
         self.sampling_period=int(self.delay*self.n_timepoints_per_sample)
-        self.timesteps=np.linspace(0, (self.n_timepoints_per_sample-1)*self.delay, self.n_timepoints_per_sample)
+        self.tstep=1/self.sampling_frequency
+        self.timesteps=np.linspace(0, (self.n_timepoints_per_sample-1)*self.tstep, self.n_timepoints_per_sample)
         self.fstep=self.sampling_frequency/self.n_timepoints_per_sample
         self.f=np.linspace(0, (self.n_timepoints_per_sample-1)*self.fstep, self.n_timepoints_per_sample)
         self.f_plot=self.f[0:int(self.n_timepoints_per_sample/2 + 1)]
@@ -286,7 +290,7 @@ class SFSystemCommunicator(gym.Env):
         return X_mag_plot
 
     def get_fft_allchannels(self, raw_data):
-        if str(raw_data) != "None":
+        if str(raw_data) == "None":
             raw_data=self.observation_space.sample()['raw_data']
 
         fft_data=[]
@@ -315,7 +319,7 @@ class SFSystemCommunicator(gym.Env):
             binname=f'{low}-{high} Hz'
             self.fbin_axis_labels.append(binname)
     def get_bin_values_allchannels(self, fft=None):
-        if str(fft) != "None":
+        if str(fft) == "None":
             fft=self.observation_space.sample()['fft']
         fbins_data=[]
         for chindex in range(fft.shape[0]):
@@ -347,21 +351,29 @@ class SFSystemCommunicator(gym.Env):
         self.ws.send("stop_data_transfer_from_ads")
     def stop_audiovis_feedback(self):
         self.ws.send("stop_led_cycle")
+    
     def update_audiovis_feedback(self, update_dict=None):
-        if str(update_dict)!= 'None':
-            update_dict=self.action_space.sample()
         self.ws.send("receive_output_control_data")
         outmsg_vals=[]
         for controlnm in self.out_order:
             outmsg_vals.append(update_dict[controlnm][0])
+        outmsg_vals=list(map(int, outmsg_vals))
         self.current_control_msg=','.join(list(map(str,outmsg_vals)))
+        #print(self.current_control_msg)
         self.ws.send(self.current_control_msg)
-    def sample_observations(self):
+
+    def synth_data(self, signal_freq=30):
+        y=1*np.sin(2*np.pi*signal_freq*self.timesteps)
+        return y
+    def sample_observations(self, use_synth_data=True): #True for testing of fft etc., False - for actual application
         self.ws.send("start_data_transfer_from_ads")
         self.current_sample=json.loads(self.ws.recv())
         self.raw_data=[]
         for key, value in self.current_sample.items():
-            self.raw_data.append(value)
+            if use_synth_data==False:
+                self.raw_data.append(value)
+            else:
+                self.raw_data.append(self.synth_data())
         self.raw_data=np.array(self.raw_data).transpose()
         self.raw_data=self.raw_data[:,self.channels_of_interest_inds]
         self.ws.send("stop_data_transfer_from_ads")
@@ -390,12 +402,13 @@ class SFSystemCommunicator(gym.Env):
             if self.write_raw==True:
                 self.write_tolog(json.dumps({'raw_data':self.cur_observations['raw_data'].tolist()}))
     def step(self, action):
+        #print(action)
         if self.ws.sock is not None:
             self.done=False
             self.best_overall_reward_now=False
             self.best_episode_reward_now=False
             self.best_total_episode_reward_now=False
-            self.update_audiovis_feedback(action)
+            self.update_audiovis_feedback(update_dict=action)
             time.sleep(self.step_stim_length)
             self.current_actions=action
             new_observations=self.sample_and_process_observations_from_device()
@@ -463,12 +476,14 @@ class SFSystemCommunicator(gym.Env):
 
         self.best_action_epoch=None
 
+
+        self.update_audiovis_feedback(update_dict=self.default_actions) #update back to default actions
         new_observations=self.sample_and_process_observations_from_device()
         self.cur_observations=new_observations
-        self.update_audiovis_feedback(update_dict=self.default_actions) #update back to default actions
         if self.collect_data_toplot==True:
             self.previous_episodes_max_rewards.append(self.episode_max_reward)
             self.cur_episode_rewards=[]
+            
         time.sleep(self.step_stim_length) #prepare the brain for the next episode 
         return new_observations, {}
 
@@ -561,6 +576,7 @@ class FlattenActionSpaceWrapper(gym.Wrapper):
                             dtype=np.int64)
 
     def step(self, action):
+        #print(action)
         # Convert the flattened action back to the original action space format
         original_action = self._unflatten_action(action)
         return super().step(original_action)
