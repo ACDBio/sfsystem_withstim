@@ -12,8 +12,32 @@ import plotly.subplots as sp
 import plotly
 import json
 import os
+import webcolors
+import random
 plotly.io.json.config.default_engine = 'orjson'
 websocket.enableTrace(False)
+def get_random_css_color_names(n, seed=333):
+    """
+    Returns a list of n different CSS color names.
+    
+    Args:
+    - n: The number of different color names to retrieve.
+    
+    Returns:
+    - A list of n different CSS color names.
+    """
+    # Get the list of all CSS color names
+    css_color_names = list(webcolors.CSS3_HEX_TO_NAMES.values())
+    
+    random.seed(seed)
+    # Randomly select n different color names
+    random_color_names = random.sample(css_color_names, n)
+    
+    return random_color_names
+
+# Example usage:
+# Get a list of 10 different CSS color names
+color_names = get_random_css_color_names(50)
 
 #steps are not implemented for now
 out_dict={'leddelay':{'names':['leddelay'], 'value_range':{'min':1, 'max':10001, 'step':100}, 'init_val':{'leddelay':10}},
@@ -65,7 +89,9 @@ class SFSystemCommunicator(gym.Env):
                  write_bins=True,
                  log_best_actions_every_episode=True,
                  log_actions_every_step=True,
-                 render_each_step=True):
+                 render_each_step=True,
+                 colors=color_names):
+        self.colors=colors
         self.device_address=device_address
         self.step_stim_length=step_stim_length_millis/1000
         self.episode_time_seconds=episode_time_seconds
@@ -165,9 +191,15 @@ class SFSystemCommunicator(gym.Env):
         self.done=False
         self.training_completed=False
         self.figures={'signal_fig':[],'training_fig':[]}
+        self.colornames=color_names
     def create_log(self):
         if not os.path.isfile(self.logfn):
             open(self.logfn, 'a').close()
+    
+
+
+
+
     def write_tolog(self, string):
         with open(self.logfn, 'a') as log_file:
             log_file.write(string + '\n')
@@ -458,6 +490,7 @@ class SFSystemCommunicator(gym.Env):
     def reset(self):
         if self.cur_step>0:
             if self.done:
+                print('HERE')
                 if self.collect_data_toplot:
                     self.previous_episodes_total_rewards.append(self.total_cur_episode_reward)
                     self.previous_episodes_max_rewards.append(self.episode_max_reward)
@@ -496,7 +529,8 @@ class SFSystemCommunicator(gym.Env):
             od[key]=value.tolist()
         return json.dumps(od)
 
-    def render(self, elems=['reward_lineplots', 'current_fft', 'current_fbins'], return_figs=False, jnb=False, collect_figs=True):
+    def render(self, elems=['reward_lineplots', 'current_fft', 'current_fbins'], return_figs=False, jnb=False):
+
         if jnb:
             clear_output(wait=True)
         if return_figs==None:
@@ -517,14 +551,16 @@ class SFSystemCommunicator(gym.Env):
                 signal_fig.update_layout(width=self.signal_plot_width, height = self.signal_plot_height)
                 if 'current_fft' in elems and self.record_fft:
                     for chidx in range(self.n_channels_of_interest):
+                        color=self.colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
                         chfft=self.cur_observations['fft'][chidx]
-                        signal_fig.add_trace(sp.go.Scatter(x=self.f_plot, y=chfft, mode='lines+markers', name=f'Channel {orig_chidx} spectrum'), row=chidx+1, col=1)
+                        signal_fig.add_trace(sp.go.Scatter(x=self.f_plot, y=chfft, mode='lines+markers', name=f'Channel {orig_chidx} spectrum', line=dict(color=color)), row=chidx+1, col=1)
                 if 'current_fbins' in elems and self.record_fbins:
                     for chidx in range(self.n_channels_of_interest):
+                        color=self.colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
                         chbins=self.cur_observations['fbins'][chidx]
-                        signal_fig.add_trace(sp.go.Bar(x=self.fbin_axis_labels, y=chbins, name=f'Channel {orig_chidx} frequency bins'), row=chidx+1, col=2)
+                        signal_fig.add_trace(sp.go.Bar(x=self.fbin_axis_labels, y=chbins, name=f'Channel {orig_chidx} frequency bins', marker=dict(color=color)), row=chidx+1, col=2)
                 if self.render_data:
                     if jnb==True:
                         signal_fig.show()
@@ -562,66 +598,7 @@ class SFSystemCommunicator(gym.Env):
         if self.ws.sock is not None:
             self.ws.close()
         
-        
-# class FlattenActionSpaceWrapper(gym.Wrapper):
-#     def __init__(self, env):
-#         super().__init__(env)
-#         # Flatten the action space
-#         self.action_space = self._flatten_action_space(env.action_space)
-
-#     def _flatten_action_space(self, original_space):
-#         # Calculate the total size of the flattened action space
-#         total_size = sum(space.shape[0] for space in original_space.spaces.values())
-#         # Create a new Box space with the total size
-#         return spaces.Box(low=np.concatenate([space.low for space in original_space.spaces.values()]),
-#                             high=np.concatenate([space.high for space in original_space.spaces.values()]),
-#                             shape=(total_size,),
-#                             dtype=np.int64)
-
-#     def step(self, action):
-#         #print(action)
-#         # Convert the flattened action back to the original action space format
-#         original_action = self._unflatten_action(action)
-#         return super().step(original_action)
-
-#     def _unflatten_action(self, action):
-#         # Split the flattened action into the original spaces
-#         original_action = {}
-#         start = 0
-#         for key, space in self.env.action_space.spaces.items():
-#             end = start + space.shape[0]
-#             original_action[key] = action[start:end]
-#             start = end
-#         return original_action
-# class FlattenActionSpaceWrapper(gym.Wrapper):
-#     def __init__(self, env, min_value=-1.0, max_value=1.0):
-#         super().__init__(env)
-#         # Flatten the action space
-#         self.action_space = self._flatten_action_space(env.action_space, min_value, max_value)
-
-#     def _flatten_action_space(self, original_space, min_value, max_value):
-#         # Calculate the total size of the flattened action space
-#         total_size = sum(space.shape[0] for space in original_space.spaces.values())
-#         # Create a new Box space with the total size and normalized bounds
-#         return spaces.Box(low=np.float32(np.full(total_size, min_value)),
-#                             high=np.float32(np.full(total_size, max_value)),
-#                             shape=(total_size,),
-#                             dtype=np.float32) # Assuming the action space is continuous
-
-#     def _unflatten_action(self, action):
-#         # Split the flattened action into the original spaces
-#         original_action = {}
-#         start = 0
-#         for key, space in self.env.action_space.spaces.items():
-#             end = start + space.shape[0]
-#             original_action[key] = action[start:end]
-#             start = end
-#         return original_action
-
-#     def step(self, action):
-#         # Convert the flattened action back to the original action space format
-#         original_action = self._unflatten_action(action)
-#         return super().step(original_action)            
+               
 
 
 class FlattenActionSpaceWrapper(gym.Wrapper):
@@ -715,11 +692,11 @@ class stable_baselines_model_trainer():
     def close_env(self):
         self.env.close()
 
-    def train(self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps='episode', log_or_plot_every_n_timesteps=1, jnb=True):
+    def train(self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps=1, log_or_plot_every_n_timesteps=1, jnb=True):
         if self.env.ws.sock is not None:
             self.training_completed=False
-            if n_total_timesteps=='episode':
-                n_total_timesteps=int(self.env.n_steps_per_episode/self.n_steps_per_timestep) #we run one episode + 1 step before resetting, episode 
+            #if n_total_timesteps=='episode':
+            #    n_total_timesteps=int(self.env.n_steps_per_episode/self.n_steps_per_timestep) #we run one episode + 1 step before resetting, episode 
             for i in range(num_episodes):
                 self.cur_n_timesteps=0
                 while self.cur_n_timesteps<int(n_total_timesteps): #here-for A2C

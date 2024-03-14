@@ -177,12 +177,12 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
                 value='A2C',
                 multi=False), 
                 'N steps per timestep (for PPO, A2C): ',
-                dcc.Input(type='number', placeholder='N steps', value=1, id='n_steps_per_timestep'), 
-                html.Br(),
-                'N timesteps per algorithm training episode: ',
-                dcc.Input(type='number', placeholder='N timesteps', value=0, id='n_total_timesteps'), 
+                dcc.Input(type='number', placeholder='N steps', value=0, id='n_steps_per_timestep'), 
                 html.Br(),
                 '(to use the step count corresponding to the episode time set 0)',
+                html.Br(),
+                'N timesteps per algorithm training episode: ',
+                dcc.Input(type='number', placeholder='N timesteps', value=1, id='n_total_timesteps'), 
                 html.Br(),
                 'N episodes: ',
                 dcc.Input(type='number', placeholder='N episodes', value=5, id='num_episodes'), 
@@ -479,8 +479,7 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
     session_settings_dict['step_stim_length_millis']=step_stim_length_millis
     session_settings_dict['episode_time_seconds']=episode_time_seconds
 
-    if n_total_timesteps==0:
-        n_total_timesteps='episode'
+
     session_settings_dict['n_total_timesteps']=n_total_timesteps
     session_settings_dict['num_episodes']=num_episodes
     session_settings_dict['logfn']=logfn
@@ -515,6 +514,9 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
             session_settings_dict['log_model']=True
     session_settings_dict['log_or_plot_every_n_timesteps']=log_or_plot_every_n_timesteps
     session_settings_dict['algorithm']=algorithm
+
+    if n_steps_per_timestep==0:
+        n_steps_per_timestep=int((episode_time_seconds*1000)/step_stim_length_millis)+1
     session_settings_dict['n_steps_per_timestep']=n_steps_per_timestep
     if 'Raw signal values' in obs_space_opts:
         session_settings_dict['use_raw_in_os_def']=True
