@@ -150,7 +150,7 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
                 dcc.Checklist(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Raw signal values','Frequency spectra', 'Frequency bin values'], id='observational_space_datatypes'),
                 html.Br(),
                 'Frequency bins to record: ',
-                dcc.Input(type='text', placeholder='Bin values, Hz', value='0,1;1,4;4,8;8,12;12,30', id='fbins'),   
+                dcc.Input(type='text', placeholder='Bin values, Hz', value='0,1;1,4;4,8;8,12;12,30;30,50', id='fbins'),   
                 html.Br(),
                 'Device address: ',
                 dcc.Input(type='text', placeholder='Bin values, Hz', value='ws://10.42.0.231:80/', id='device_address'),  

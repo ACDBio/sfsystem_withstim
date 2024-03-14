@@ -352,14 +352,15 @@ class SFSystemCommunicator(gym.Env):
     def stop_audiovis_feedback(self):
         self.ws.send("stop_led_cycle")
     
-    def update_audiovis_feedback(self, update_dict=None):
+    def update_audiovis_feedback(self, update_dict=None, print_msg=True):
         self.ws.send("receive_output_control_data")
         outmsg_vals=[]
         for controlnm in self.out_order:
             outmsg_vals.append(update_dict[controlnm][0])
         outmsg_vals=list(map(int, outmsg_vals))
         self.current_control_msg=','.join(list(map(str,outmsg_vals)))
-        #print(self.current_control_msg)
+        if print_msg==True:
+            print(self.current_control_msg)
         self.ws.send(self.current_control_msg)
 
     def synth_data(self, signal_freq=30):
