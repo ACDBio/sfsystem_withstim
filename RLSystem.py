@@ -357,6 +357,7 @@ class SFSystemCommunicator(gym.Env):
         outmsg_vals=[]
         for controlnm in self.out_order:
             outmsg_vals.append(update_dict[controlnm][0])
+        print(outmsg_vals)
         outmsg_vals=list(map(int, outmsg_vals))
         self.current_control_msg=','.join(list(map(str,outmsg_vals)))
         if print_msg==True:
@@ -561,26 +562,84 @@ class SFSystemCommunicator(gym.Env):
             self.ws.close()
         
         
+# class FlattenActionSpaceWrapper(gym.Wrapper):
+#     def __init__(self, env):
+#         super().__init__(env)
+#         # Flatten the action space
+#         self.action_space = self._flatten_action_space(env.action_space)
+
+#     def _flatten_action_space(self, original_space):
+#         # Calculate the total size of the flattened action space
+#         total_size = sum(space.shape[0] for space in original_space.spaces.values())
+#         # Create a new Box space with the total size
+#         return spaces.Box(low=np.concatenate([space.low for space in original_space.spaces.values()]),
+#                             high=np.concatenate([space.high for space in original_space.spaces.values()]),
+#                             shape=(total_size,),
+#                             dtype=np.int64)
+
+#     def step(self, action):
+#         #print(action)
+#         # Convert the flattened action back to the original action space format
+#         original_action = self._unflatten_action(action)
+#         return super().step(original_action)
+
+#     def _unflatten_action(self, action):
+#         # Split the flattened action into the original spaces
+#         original_action = {}
+#         start = 0
+#         for key, space in self.env.action_space.spaces.items():
+#             end = start + space.shape[0]
+#             original_action[key] = action[start:end]
+#             start = end
+#         return original_action
+# class FlattenActionSpaceWrapper(gym.Wrapper):
+#     def __init__(self, env, min_value=-1.0, max_value=1.0):
+#         super().__init__(env)
+#         # Flatten the action space
+#         self.action_space = self._flatten_action_space(env.action_space, min_value, max_value)
+
+#     def _flatten_action_space(self, original_space, min_value, max_value):
+#         # Calculate the total size of the flattened action space
+#         total_size = sum(space.shape[0] for space in original_space.spaces.values())
+#         # Create a new Box space with the total size and normalized bounds
+#         return spaces.Box(low=np.float32(np.full(total_size, min_value)),
+#                             high=np.float32(np.full(total_size, max_value)),
+#                             shape=(total_size,),
+#                             dtype=np.float32) # Assuming the action space is continuous
+
+#     def _unflatten_action(self, action):
+#         # Split the flattened action into the original spaces
+#         original_action = {}
+#         start = 0
+#         for key, space in self.env.action_space.spaces.items():
+#             end = start + space.shape[0]
+#             original_action[key] = action[start:end]
+#             start = end
+#         return original_action
+
+#     def step(self, action):
+#         # Convert the flattened action back to the original action space format
+#         original_action = self._unflatten_action(action)
+#         return super().step(original_action)            
+
+
 class FlattenActionSpaceWrapper(gym.Wrapper):
-    def __init__(self, env):
+    def __init__(self, env, min_value=-1.0, max_value=1.0):
         super().__init__(env)
         # Flatten the action space
-        self.action_space = self._flatten_action_space(env.action_space)
+        self.action_space = self._flatten_action_space(env.action_space, min_value, max_value)
+        # Store the normalization values
+        self.min_value = min_value
+        self.max_value = max_value
 
-    def _flatten_action_space(self, original_space):
+    def _flatten_action_space(self, original_space, min_value, max_value):
         # Calculate the total size of the flattened action space
         total_size = sum(space.shape[0] for space in original_space.spaces.values())
-        # Create a new Box space with the total size
-        return spaces.Box(low=np.concatenate([space.low for space in original_space.spaces.values()]),
-                            high=np.concatenate([space.high for space in original_space.spaces.values()]),
+        # Create a new Box space with the total size and normalized bounds
+        return spaces.Box(low=np.float32(np.full(total_size, min_value)),
+                            high=np.float32(np.full(total_size, max_value)),
                             shape=(total_size,),
-                            dtype=np.int64)
-
-    def step(self, action):
-        #print(action)
-        # Convert the flattened action back to the original action space format
-        original_action = self._unflatten_action(action)
-        return super().step(original_action)
+                            dtype=np.float32) # Assuming the action space is continuous
 
     def _unflatten_action(self, action):
         # Split the flattened action into the original spaces
@@ -591,6 +650,33 @@ class FlattenActionSpaceWrapper(gym.Wrapper):
             original_action[key] = action[start:end]
             start = end
         return original_action
+
+    def unnormalize_action(self, normalized_action):
+        """
+        Unnormalizes an action from the range [min_value, max_value] back to its original scale.
+        
+        Args:
+        - normalized_action: A dictionary representing the normalized action.
+        
+        Returns:
+        - The unnormalized action.
+        """
+        unnormalized_action = {}
+        for key, space in self.env.action_space.spaces.items():
+            unnormalized_action[key] = space.low + (normalized_action[key] - self.min_value) * (space.high - space.low) / (self.max_value - self.min_value)
+        return unnormalized_action
+
+    def step(self, action):
+        # Convert the flattened action back to the original action space format
+        original_action = self._unflatten_action(action)
+        # Unnormalize the action
+        unnormalized_action = self.unnormalize_action(original_action)
+        return super().step(unnormalized_action)
+
+
+
+
+
     
 from stable_baselines3 import A2C
 from stable_baselines3.common.env_checker import check_env
