@@ -357,7 +357,8 @@ class SFSystemCommunicator(gym.Env):
         outmsg_vals=[]
         for controlnm in self.out_order:
             outmsg_vals.append(update_dict[controlnm][0])
-        print(outmsg_vals)
+        if print_msg==True:
+            print(outmsg_vals)
         outmsg_vals=list(map(int, outmsg_vals))
         self.current_control_msg=','.join(list(map(str,outmsg_vals)))
         if print_msg==True:
