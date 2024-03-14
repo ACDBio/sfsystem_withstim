@@ -6,6 +6,7 @@ from dash import callback
 import threading
 import webcolors
 import random
+from dash.exceptions import PreventUpdate
 
 dash.register_page(__name__,'/')
 
@@ -19,7 +20,10 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
     dcc.Interval(id='training_status_update', disabled=True, n_intervals=0, max_intervals=-1),
     dbc.Row(justify="start", children=[dcc.Markdown("##### Audiovisual space setup"),
                       html.Hr(),
-                      dbc.Col(width='auto',children=[            
+                      dbc.Col(width='auto',children=[ 
+
+            dcc.RadioItems(options=['Set fully blank defaults','Set no lighting defaults','Set specific defaults'], value='Set specific defaults', id='defaults_mode'),     
+            html.Br(),   
             dcc.Markdown("Lighting setup"),
             html.Div('Flash frequency, Hz'),
             html.Br(),
@@ -87,7 +91,7 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
                         'Volume range',
                         dcc.RangeSlider(min=0, max=50, step=1, marks=None, value=[1, 25], tooltip={"placement": "bottom", "always_visible": True},id='volume_range'),
                         'Initial volume: ',
-                        dcc.Input(type='number', placeholder='Volume level', value=10, id='maxivolume')                                            
+                        dcc.Input(type='number', placeholder='Volume level', value=5, id='maxivolume')                                            
                                             
                                             
                                             ]
@@ -168,7 +172,7 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
                 dcc.Input(type='number', placeholder='Length, ms', value=10000, id='step_stim_length_millis'),  
                 html.Br(),
                 'Episode time (approximate): ',
-                dcc.Input(type='number', placeholder='Length, ms', value=60, id='episode_time_seconds'), 
+                dcc.Input(type='number', placeholder='Length, s', value=60, id='episode_time_seconds'), 
                 html.Br(),
                 html.Br(),
                 dcc.Markdown('RL training settings'),
@@ -188,6 +192,9 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
                 html.Br(),
                 'N episodes: ',
                 dcc.Input(type='number', placeholder='N episodes', value=5, id='num_episodes'), 
+                html.Br(),
+                'Reset stage length: ',
+                dcc.Input(type='number', placeholder='Length, s', value=10, id='stim_length_on_reset'), 
                 html.Br(),
 
 
@@ -283,6 +290,30 @@ def code_wave_shapes(w):
     if w=='Triangle':
         return 3
     
+@callback([Output('l1c','value'),
+          Output('l2c','value'),
+          Output('l3c','value'),
+          Output('l4c','value'),
+          Output('l5c','value'),
+          Output('l6c','value'),
+          Output('l7c','value'),
+          Output('l8c','value'),
+          Output('maxivolume','value')],
+          Input('defaults_mode', 'value'),
+          State('maxivolume','value'),
+          prevent_initial_call=True)
+def change_defaults(dm, vol):
+    if dm=='Set specific defaults':
+        raise PreventUpdate
+    if dm=='Set no lighting defaults':
+        return ['0,0,0' for i in range(8)]+[vol]
+    if dm=='Set fully blank defaults':
+        return ['0,0,0' for i in range(8)]+[0]
+    
+   
+
+
+
 @callback(Output('training_figure_container', "children"),
           Output('signal_figure_container', "children"),
           Input('training_status_update', 'n_intervals'),
@@ -300,7 +331,21 @@ def collect_settings(n_intervals):
                     
     return training_fig, signal_fig
 
-
+@callback(Output('signal_plot_color','value'),
+          Input("color_resample", 'n_clicks'),
+          State('signal_plot_color','value'),
+          State('settings_dictionary', 'data'),
+          prevent_initial_call=True)
+def collect_settings(n_clicks, sigplot_color, setd):
+    global env
+    #print(env.figures)
+    if sigplot_color.split(',')[0]=='random':
+        sigplot_colors=get_random_css_color_names(setd['session_settings']['n_input_channels'], seed=int(sigplot_color.split(',')[1]))
+    else:
+        sigplot_colors=[sigplot_color for i in range(setd['session_settings']['n_input_channels'])]
+    env.colors=sigplot_colors
+                    
+    return sigplot_color
 
 
 @callback(Output("start_session_train", "style"),
@@ -368,6 +413,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                               render_data=sd['render_data'],
                                               render_each_step=sd['render_each_step'],
                                               log_actions_every_step=sd['log_actions_every_step'],
+                                              stim_length_on_reset=sd['stim_length_on_reset'],
                                               colors=sigplot_colors)
           #env.step(env.action_space.sample()) #sample step
           trainer=stable_baselines_model_trainer(initialized_environment=env,
@@ -471,6 +517,7 @@ def start_training(sd):
               Input('training_plot_width', 'value'),
               Input('training_plot_height', 'value'),
               Input('render_data','value'),
+              Input('stim_length_on_reset','value'),
               prevent_initial_call=False)
 def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
                      l1c,l2c,l3c,l4c,l5c,l6c,l7c,l8c,sound_wave_frange,
@@ -484,7 +531,7 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
                      logging_plotting_opts,
                      log_or_plot_every_n_timesteps, algorithm, n_steps_per_timestep, obs_space_opts,
                      signal_plot_width, signal_plot_height,training_plot_width,training_plot_height, render_data,
-                     ):
+                     stim_length_on_reset):
     ffminf=1000/ffminf #delay = 1000 ms/ n flashes per second
     ffmaxf=1000/ffmaxf
     ffinitf=1000/ffinitf
@@ -524,6 +571,7 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
     session_settings_dict['training_plot_width']=training_plot_width
     session_settings_dict['training_plot_height']=training_plot_height
     session_settings_dict['render_each_step']=True #no control, by default
+    session_settings_dict['stim_length_on_reset']=stim_length_on_reset #no control, by default
     if len(render_data)>0:
         session_settings_dict['render_data']=True
     else:
