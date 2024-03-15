@@ -446,6 +446,8 @@ class SFSystemCommunicator(gym.Env):
             self.best_overall_reward_now=False
             self.best_episode_reward_now=False
             self.best_total_episode_reward_now=False
+
+
             self.update_audiovis_feedback(update_dict=action)
             time.sleep(self.step_stim_length)
             self.current_actions=action
@@ -455,15 +457,16 @@ class SFSystemCommunicator(gym.Env):
             reward_val=reward.tolist()
             self.reward_cur=reward
             self.total_cur_episode_reward+=reward_val
-            if reward_val>self.episode_max_reward:
+            if reward_val>=self.episode_max_reward:
                     self.episode_max_reward=reward_val
                     self.best_episode_reward_now=True
                     self.best_action_episode=action
-            if reward_val>self.overall_max_reward:
+            if reward_val>=self.overall_max_reward:
+                    #print('setting best overall reward')
                     self.overall_max_reward=reward_val
                     self.best_overall_reward_now=True
                     self.best_action_overall=action
-            if self.total_cur_episode_reward>self.total_episode_max_reward:
+            if self.total_cur_episode_reward>=self.total_episode_max_reward:
                 self.total_episode_max_reward=self.total_cur_episode_reward
                 self.best_total_episode_reward_now=True
 
@@ -486,11 +489,20 @@ class SFSystemCommunicator(gym.Env):
                 self.done=True
             if self.render_each_step==True:
                 self.render()
+            #print('step_done')
             return new_observations, reward, self.done, {} #False
         else:
             print('No connection')
             return
+    def clear_all_stats(self):
+        self.episode_max_reward=0
+        self.total_cur_episode_reward=0
+        self.best_episode_reward_now=False #just in case
+        self.best_overall_reward_now=False #just in case
+        self.best_total_episode_reward_now=False #just in case
+
     def reset(self):
+        #print('resetting')
         if self.cur_step>0:
             if self.done:
                 if self.collect_data_toplot:
@@ -504,19 +516,8 @@ class SFSystemCommunicator(gym.Env):
                     self.write_tolog(actionstring)
         self.stop_audiovis_feedback()
         self.cur_step=0
-        self.episode_max_reward=0
-        self.total_cur_episode_reward=0
-
         self.done=False
-        self.best_episode_reward_now=False #just in case
-        self.best_overall_reward_now=False #just in case
-        self.best_total_episode_reward_now=False #just in case
-
-        self.best_action_epoch=None
-
-
         self.update_audiovis_feedback(update_dict=self.default_actions) #update back to default actions
-        
         
         if self.collect_data_toplot==True:
             self.previous_episodes_max_rewards.append(self.episode_max_reward)
@@ -678,8 +679,8 @@ class stable_baselines_model_trainer():
         self.set_model()
         self.max_test_reward=0
         self.logfn=logfn
-        if os.path.isfile(self.logfn):
-            os.remove(self.logfn)
+        if not os.path.isfile(self.logfn):
+            open(self.logfn, 'a').close()
     def set_model(self):
         if self.algorithm=='PPO':
             self.model = PPO(self.policy, self.env, n_steps=self.n_steps_per_timestep)
@@ -697,7 +698,7 @@ class stable_baselines_model_trainer():
     def close_env(self):
         self.env.close()
 
-    def train(self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps=1, log_or_plot_every_n_timesteps=1, jnb=True):
+    def train(self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps=1, log_or_plot_every_n_timesteps=1, jnb=False):
         if self.env.ws.sock is not None:
             self.training_completed=False
             #if n_total_timesteps=='episode':
@@ -716,14 +717,22 @@ class stable_baselines_model_trainer():
                             if jnb:
                                 clear_output(wait=True)
                         if log_model:
+                            #print('in log_model')
+                            #print(self.env.best_overall_reward_now)
+                            #print(self.env.reward)
+                            #print(self.env.overall_max_reward)
+                            #print(self.env.best_total_episode_reward_now)
                             if self.env.best_overall_reward_now:
                                 self.model.save("best_overall_reward_model")
-                                with open(self.logfn, 'w') as log_file:
+                                with open(self.logfn, 'a') as log_file:
+                                    print('WRITING TO LOG')
                                     log_file.write(f'target {self.env.reward_formula_string}, current best_overall_reward_model reward {self.env.overall_max_reward}, file best_overall_reward_model' + '\n')
                             if self.env.best_total_episode_reward_now:
                                 self.model.save("best_total_episode_reward_model")
-                                with open(self.logfn, 'w') as log_file:
+                                with open(self.logfn, 'a') as log_file:
                                     log_file.write(f'target {self.env.reward_formula_string}, current best_total_episode_reward_model reward {self.env.total_episode_max_reward}, file best_total_episode_reward_model' + '\n')
+                    
+                        self.env.clear_all_stats()
                     else:
                         print('Connection stopped.')
                         break

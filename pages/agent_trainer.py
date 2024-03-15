@@ -6,6 +6,7 @@ from dash import callback
 import threading
 import webcolors
 import random
+import os
 from dash.exceptions import PreventUpdate
 
 dash.register_page(__name__,'/')
@@ -247,7 +248,9 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Br(),
                 'Use "random,seed" for a random color sample',
                 html.Br(),
-                html.Button("Resample colors", id="color_resample", style=b_vis, n_clicks=0)
+                html.Button("Resample colors", id="color_resample", style=b_vis, n_clicks=0),
+                ' ',
+                html.Button("Clear logs", id="clear_logfiles", style=b_vis, n_clicks=0),
                  ]),
                   html.Br(),
                   html.Div(id='training_figure_container', children=[]),
@@ -310,7 +313,21 @@ def change_defaults(dm, vol):
     if dm=='Set fully blank defaults':
         return ['0,0,0' for i in range(8)]+[0]
     
-   
+@callback(Output('clear_logfiles', 'children'),
+          Input('clear_logfiles', 'n_clicks'),
+          State('clear_logfiles', 'children'),
+          State('logfn','value'),
+          prevent_initial_call=True)
+def clear_logfiles(n_clicks, ch, logfn):
+    if os.path.isfile(logfn):
+        os.remove(logfn)
+    if not os.path.isfile(logfn):
+        open(logfn, 'a').close()
+    if os.path.isfile('model_stats.log'): #ADDITIONALLY REMOVING ALSO MODEL STATS
+        os.remove('model_stats.log')
+    if not os.path.isfile('model_stats.log'):
+        open('model_stats.log', 'a').close()
+    return ch
 
 
 
