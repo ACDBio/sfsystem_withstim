@@ -229,7 +229,10 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
             ]),
             html.Br(),
             html.Div(children=['Session data update minimal interval: ',
-            dcc.Input(type='number', placeholder='interval, ms', value=1000, id='info_upd_interval', size=30),]), 
+            dcc.Input(type='number', placeholder='interval, ms', value=1000, id='info_upd_interval', size=30),
+            ' ',
+            'Step count for a dynamic notrain session: ',
+            dcc.Input(type='number', placeholder='N steps', value=360, id='n_steps_notrain', size=30),]), 
             html.Div(children=[
             html.Button("Launch training session", id="start_session_train", style=b_vis, n_clicks=0),
             ' ',
@@ -385,8 +388,9 @@ def collect_settings(n_clicks, sigplot_color, setd):
           State('settings_dictionary', 'data'),
           State('info_upd_interval', 'value'), 
           State('signal_plot_color','value'),
+          State('n_steps_notrain','value'),
           prevent_initial_call=True)
-def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, setd, info_upd_interval, sigplot_color):
+def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, setd, info_upd_interval, sigplot_color, n_steps_notrain):
     global env
     global trainer
     trigger = ctx.triggered[0]
@@ -398,10 +402,10 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         sigplot_colors=get_random_css_color_names(sd['n_input_channels'], seed=int(sigplot_color.split(',')[1]))
     else:
         sigplot_colors=[sigplot_color for i in range(sd['n_input_channels'])]
-    if trigger_id =='start_session_train':
-          #print(sd)
-          #print(out_dict)
-          env = SFSystemCommunicator(out_dict=out_dict,
+
+
+
+    env = SFSystemCommunicator(out_dict=out_dict,
                                               n_input_channels=sd['n_input_channels'],
                                               channels_of_interest_inds=sd['channels_of_interest_inds'],
                                               n_timepoints_per_sample=sd['n_timepoints_per_sample'],
@@ -432,15 +436,18 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                               log_actions_every_step=sd['log_actions_every_step'],
                                               stim_length_on_reset=sd['stim_length_on_reset'],
                                               colors=sigplot_colors)
+
+              #print(sd)
+          #print(out_dict)
           #env.step(env.action_space.sample()) #sample step
-          trainer=stable_baselines_model_trainer(initialized_environment=env,
+    trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                           algorithm=sd['algorithm'],
                                                           policy='MlpPolicy',
                                                           logfn='model_stats.log',
                                                           n_steps_per_timestep=sd['n_steps_per_timestep'])
           
 
-          training_args={
+    training_args={
               'num_episodes':sd['num_episodes'],
               'log_model':sd['log_model'],
               'n_total_timesteps':sd['n_total_timesteps'],
@@ -448,11 +455,26 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
               'jnb':False
               
           }
+    
+    if trigger_id =='start_session_train':
+          #print(sd)
+          #print(out_dict)
+          #env.step(env.action_space.sample()) #sample step
           #print(training_args)
           training_thread = threading.Thread(target=start_training, args=(training_args,))
           training_thread.daemon = True
           training_thread.start()
           return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval
+    if trigger_id=="start_session_static":
+          training_thread = threading.Thread(target=start_session_static)
+          training_thread.daemon = True
+          training_thread.start()
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval    
+    if trigger_id=="start_session_notrain":
+          training_thread = threading.Thread(target=start_session_notrain, args=({'n_steps_notrain':n_steps_notrain},))
+          training_thread.daemon = True
+          training_thread.start()
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval 
     if trigger_id=="stop_session_train":
         trainer.close_env()
         return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval
@@ -474,11 +496,34 @@ def start_training(sd):
     except Exception as e:
         print(f"Training thread terminated: {e}")
 
-                                              
-      
-
-
-
+def start_session_static():
+    global env
+    global trainer
+    try:
+        trainer.static_launch()
+    except Exception as e:
+        print(f"Training thread terminated: {e}")
+        try:
+            trainer.env.close()
+        except Exception as e:
+            print(f"On environment closue: {e}")
+def start_session_notrain(arg):
+    global env
+    global trainer
+    nsteps_notrain=arg['n_steps_notrain']
+    while nsteps_notrain>0:
+        try:
+            trainer.dynamic_launch()
+            nsteps_notrain-=1
+        except Exception as e:
+            n_steps_notrain=0
+            print(f"Training thread terminated: {e}")
+            try:
+                trainer.env.close()
+            except Exception as e:
+                print(f"On environment closue: {e}")
+            break
+            
 
 
 

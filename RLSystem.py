@@ -679,6 +679,7 @@ from IPython.display import clear_output
 class stable_baselines_model_trainer():
     def __init__(self, initialized_environment, algorithm='A2C', policy='MlpPolicy', logfn='model_stats.log', n_steps_per_timestep=1):
         self.env=initialized_environment
+        self.orig_env=initialized_environment
         self.env = FlattenObservation(self.env)
         self.env = FlattenActionSpaceWrapper(self.env)
         self.algorithm=algorithm
@@ -689,6 +690,10 @@ class stable_baselines_model_trainer():
         self.logfn=logfn
         if not os.path.isfile(self.logfn):
             open(self.logfn, 'a').close()
+    def static_launch(self):
+        self.orig_env.step(self.orig_env.default_actions)
+    def dynamic_launch(self):
+        self.env.step(self.env.action_space.sample())
     def set_model(self):
         if self.algorithm=='PPO':
             self.model = PPO(self.policy, self.env, n_steps=self.n_steps_per_timestep)
