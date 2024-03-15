@@ -534,7 +534,7 @@ class SFSystemCommunicator(gym.Env):
             od[key]=value.tolist()
         return json.dumps(od)
 
-    def render(self, elems=['reward_lineplots', 'current_fft', 'current_fbins'], return_figs=False, jnb=False, colors=None):
+    def render(self, elems=['reward_lineplots', 'current_fft', 'current_fbins', 'current_raw'], return_figs=False, jnb=False, colors=None):
         if str(colors)=='None':
             colors=self.colors
         if jnb:
@@ -553,7 +553,7 @@ class SFSystemCommunicator(gym.Env):
                     training_fig.show()
         if ('current_fft' in elems) or ('current_fbins' in elems):
             if self.record_fft or self.record_fbins:
-                signal_fig=sp.make_subplots(rows=self.n_channels_of_interest, cols=2)
+                signal_fig=sp.make_subplots(rows=self.n_channels_of_interest, cols=3)
                 signal_fig.update_layout(width=self.signal_plot_width, height = self.signal_plot_height)
                 if 'current_fft' in elems and self.record_fft:
                     for chidx in range(self.n_channels_of_interest):
@@ -567,6 +567,14 @@ class SFSystemCommunicator(gym.Env):
                         orig_chidx=self.channels_of_interest_inds[chidx]
                         chbins=self.cur_observations['fbins'][chidx]
                         signal_fig.add_trace(sp.go.Bar(x=self.fbin_axis_labels, y=chbins, name=f'Channel {orig_chidx} frequency bins', marker=dict(color=color)), row=chidx+1, col=2)
+                if 'current_raw' in elems and self.record_raw:
+                    for chidx in range(self.n_channels_of_interest):
+                        color=colors[chidx]
+                        orig_chidx=self.channels_of_interest_inds[chidx]
+                        chraw=self.cur_observations['raw_data'][:,chidx]
+                        signal_fig.add_trace(sp.go.Scatter(x=list(range(len(chraw))), y=chraw, mode='lines+markers', name=f'Channel {orig_chidx} raw signal', line=dict(color=color)), row=chidx+1, col=3)                
+                
+                
                 if self.render_data:
                     if jnb==True:
                         signal_fig.show()
