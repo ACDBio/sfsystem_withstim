@@ -717,15 +717,9 @@ class stable_baselines_model_trainer():
                             if jnb:
                                 clear_output(wait=True)
                         if log_model:
-                            #print('in log_model')
-                            #print(self.env.best_overall_reward_now)
-                            #print(self.env.reward)
-                            #print(self.env.overall_max_reward)
-                            #print(self.env.best_total_episode_reward_now)
                             if self.env.best_overall_reward_now:
                                 self.model.save("best_overall_reward_model")
                                 with open(self.logfn, 'a') as log_file:
-                                    print('WRITING TO LOG')
                                     log_file.write(f'target {self.env.reward_formula_string}, current best_overall_reward_model reward {self.env.overall_max_reward}, file best_overall_reward_model' + '\n')
                             if self.env.best_total_episode_reward_now:
                                 self.model.save("best_total_episode_reward_model")

@@ -1,6 +1,7 @@
 import dash
 import dash_bootstrap_components as dbc
-
+import plotly.io as pio
+pio.templates.default = 'simple_white'
 
 app = dash.Dash(__name__, use_pages=True, external_stylesheets=[dbc.themes.FLATLY])
 
