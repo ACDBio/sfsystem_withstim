@@ -127,10 +127,10 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
             dbc.Col(width='auto', children=[
             html.Div(children=[
                 'Total channel count: ',
-                dcc.Input(type='number', placeholder='N channels', value=8, id='n_input_channels'),
+                dcc.Input(type='number', placeholder='N channels', value=9, id='n_input_channels'),
                 html.Br(),
                 'Channels to observe (indexes, 0-based): ',
-                dcc.Input(type='text', placeholder='Channels of interest idx0,...idxn', value='0,1,2,3,4,5,6,7', id='channels_of_interest_inds'),
+                dcc.Input(type='text', placeholder='Channels of interest idx0,...idxn', value='0,1,2,3,4,5,6,7,8', id='channels_of_interest_inds'),
                 html.Br(),
                 'N timepoints per sample: ',
                 dcc.Input(type='number', placeholder='N points', value=100, id='n_timepoints_per_sample'),

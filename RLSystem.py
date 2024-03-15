@@ -271,7 +271,7 @@ class SFSystemCommunicator(gym.Env):
             if tartype=='raw':
                 tarobs=observations['raw_data']
                 tarobs=tarobs[:,tarchannelidx]
-                res=np.mean(tarobs) #here we use the mean, but this may be changed
+                res=np.sum(tarobs) #here we use the sum, but this may be changed
             if tartype=='freq':
                 #tarfreq=tokendata['freqdata']
                 taridx=tokendata['closest_fft_ind']
@@ -404,7 +404,7 @@ class SFSystemCommunicator(gym.Env):
     def synth_data(self, signal_freq=30):
         y=1*np.sin(2*np.pi*signal_freq*self.timesteps)
         return y
-    def sample_observations(self, use_synth_data=True): #True for testing of fft etc., False - for actual application
+    def sample_observations(self, use_synth_data=False): #True for testing of fft etc., False - for actual application
         self.ws.send("start_data_transfer_from_ads")
         self.current_sample=json.loads(self.ws.recv())
         self.raw_data=[]
