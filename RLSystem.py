@@ -96,6 +96,7 @@ class SFSystemCommunicator(gym.Env):
         self.stim_length_on_reset=stim_length_on_reset
 
         self.device_address=device_address
+        self.step_stim_length_millis=step_stim_length_millis
         self.step_stim_length=step_stim_length_millis/1000
         self.episode_time_seconds=episode_time_seconds
         self.n_steps_per_episode=int(self.episode_time_seconds/self.step_stim_length)
@@ -688,8 +689,11 @@ class stable_baselines_model_trainer():
         self.set_model()
         self.max_test_reward=0
         self.logfn=logfn
+        self.collect_environment_data()
         if not os.path.isfile(self.logfn):
             open(self.logfn, 'a').close()
+        with open(self.logfn, 'a') as log_file:
+            log_file.write(json.dumps(self.env_data) + '\n')
     def static_launch(self):
         self.orig_env.step(self.orig_env.default_actions)
     def dynamic_launch(self):
@@ -697,16 +701,22 @@ class stable_baselines_model_trainer():
     def set_model(self):
         if self.algorithm=='PPO':
             self.model = PPO(self.policy, self.env, n_steps=self.n_steps_per_timestep)
+            self.model_blank=PPO
         if self.algorithm=='SAC':
             self.model = SAC(self.policy, self.env)
+            self.model_blank=SAC
         if self.algorithm=='DDPG':
             self.model = DDPG(self.policy, self.env)
+            self.model_blank=DDPG
         if self.algorithm=='TD3':
             self.model = TD3(self.policy, self.env)
+            self.model_blank=TD3
         if self.algorithm=='A2C':
             self.model = A2C(self.policy, self.env, n_steps=self.n_steps_per_timestep)
+            self.model_blank=A2C
         if self.algorithm=='DQN':
             self.model = DQN(self.policy, self.env)
+            self.model_blank=DQN
     
     def close_env(self):
         self.env.close()
@@ -750,20 +760,50 @@ class stable_baselines_model_trainer():
         else:
             print('No connection.')
             return  
-#            obs=self.env.reset()[0]
-#            done=False
-#            while not done:
-#                action, _states = self.model.predict(obs, deterministic=True)
-#                obs, reward, done, info = self.env.step(action)
-#                if reward>self.max_test_reward:
-#                    self.max_test_reward=reward
-#                    if log_model:
-#                        self.model.save("best_test_reward_model")
+    def collect_environment_data(self):
+        env_data=dict()
+        env_data['out_dict']=self.env.out_dict
+        env_data['session_settings']=dict()
+        env_data['session_settings']['n_input_channels']=self.env.n_input_channels
+        env_data['session_settings']['channels_of_interest_inds']=self.env.channels_of_interest_inds
+        env_data['session_settings']['n_timepoints_per_sample']=self.env.n_timepoints_per_sample
+        env_data['session_settings']['max_sfsystem_output']=self.env.max_sfsystem_output
+        env_data['session_settings']['reward_formula_string']=self.env.reward_formula_string
+        env_data['session_settings']['fbins']=self.env.fbins
+        env_data['session_settings']['delay']=self.env.delay
+        env_data['session_settings']['use_raw_in_os_def']=self.env.record_raw
+        env_data['session_settings']['use_freq_in_os_def']=self.env.record_fft
+        env_data['session_settings']['use_fbins_in_os_def']=self.env.record_fbins
+        env_data['session_settings']['device_address']=self.env.device_address
+        env_data['session_settings']['step_stim_length_millis']=self.env.step_stim_length_millis
+        env_data['session_settings']['episode_time_seconds']=self.env.episode_time_seconds
+        env_data['session_settings']['logfn']=self.env.logfn
+        env_data['session_settings']['algorithm']=self.algorithm
+        env_data['session_settings']['policy']=self.policy
+        env_data['session_settings']['n_steps_per_timestep']=self.n_steps_per_timestep
+        self.env_data=env_data
+    def get_state_fromlogfile(self, logfile=None):
+        if str(logfile)=='None':
+            logfile=self.logfn
+        with open(logfile, 'r') as f:
+            data = f.read()
+        envdata=json.loads(data.split('\n')[0])
+        return envdata
+    def load_model(self, model_path):
+        self.model=self.model_blank.load(model_path)
+    def no_training_model_run(self):
+        obs=self.env.reset()[0]
+        done=False
+        while not done:
+            action, _states = self.model.predict(obs, deterministic=True)
+            obs, reward, done, info = self.env.step(action)
 
 
+  
+
         
         
-        
+
 
 
 

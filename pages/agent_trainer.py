@@ -7,6 +7,7 @@ import threading
 import webcolors
 import random
 import os
+import json
 from dash.exceptions import PreventUpdate
 
 dash.register_page(__name__,'/')
@@ -231,18 +232,23 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
             html.Div(children=['Session data update minimal interval: ',
             dcc.Input(type='number', placeholder='interval, ms', value=1000, id='info_upd_interval', size=30),
             ' ',
-            'Step count for a dynamic notrain session: ',
-            dcc.Input(type='number', placeholder='N steps', value=360, id='n_steps_notrain', size=30),]), 
+            'Step count for a dynamic notrain session or a trained model run: ',
+            dcc.Input(type='number', placeholder='N steps', value=360, id='n_steps_notrain', size=30),
+            html.Br(),
+            'Model name for upload (for the corresponding regimen): ',
+            dcc.Input(type='text', placeholder='Model name', value='best_overall_reward_model.zip', id='model_name', size=30),]), 
             html.Div(children=[
-            html.Button("Launch training session", id="start_session_train", style=b_vis, n_clicks=0),
+            html.Button("Run training session", id="start_session_train", style=b_vis, n_clicks=0),
             ' ',
-            html.Button("Launch dynamic session without training", id="start_session_notrain", style=b_vis, n_clicks=0),
+            html.Button("Run dynamic session without training", id="start_session_notrain", style=b_vis, n_clicks=0),
             ' ',
-            html.Button("Launch static session with current settings", id="start_session_static", style=b_vis, n_clicks=0),
+            html.Button("Run static session", id="start_session_static", style=b_vis, n_clicks=0),
             ' ',
             html.Button("Stop training", id="stop_session_train", style=b_invis, n_clicks=0),
             ' ',
-            html.Button("Run additional episodes", id="additional_session", style=b_invis, n_clicks=0) ])])
+            html.Button("Run additional episodes", id="additional_session", style=b_invis, n_clicks=0),
+            ' ',
+            html.Button("Run trained model", id="run_trained", style=b_vis, n_clicks=0) ])])
 ]),
 dbc.Col(children=[dcc.Markdown("### Session Data"),
                  html.Div(id='plot_style_container', children=[
@@ -366,7 +372,13 @@ def collect_settings(n_clicks, sigplot_color, setd):
     env.colors=sigplot_colors
                     
     return sigplot_color
-
+def get_state_from_model_logfile(logfile=None):
+    if str(logfile)=='None':
+        logfile='model_stats.log'
+    with open(logfile, 'r') as f:
+        data = f.read()
+    envdata=json.loads(data.split('\n')[0])
+    return envdata
 
 @callback(Output("start_session_train", "style"),
           Output("start_session_notrain", "style"),
@@ -375,6 +387,7 @@ def collect_settings(n_clicks, sigplot_color, setd):
           Output("additional_session", "style"),
           Output('training_status_update', 'disabled'),
           Output('training_status_update', 'interval'),
+          Output("run_trained", "style"),
 
           
           Input("start_session_train", "n_clicks"),
@@ -382,6 +395,7 @@ def collect_settings(n_clicks, sigplot_color, setd):
           Input("start_session_static", "n_clicks"),
           Input("stop_session_train", "n_clicks"),
           Input("additional_session", "n_clicks"),
+          Input("run_trained", "n_clicks"),
 
 
 
@@ -389,8 +403,10 @@ def collect_settings(n_clicks, sigplot_color, setd):
           State('info_upd_interval', 'value'), 
           State('signal_plot_color','value'),
           State('n_steps_notrain','value'),
+          State('model_name', 'value'),
           prevent_initial_call=True)
-def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, setd, info_upd_interval, sigplot_color, n_steps_notrain):
+def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, setd, info_upd_interval, sigplot_color, n_steps_notrain,
+                     model_name):
     global env
     global trainer
     trigger = ctx.triggered[0]
@@ -404,8 +420,86 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         sigplot_colors=[sigplot_color for i in range(sd['n_input_channels'])]
 
 
+    if trigger_id in ['start_session_train', "start_session_static","start_session_notrain"]:
+        env = SFSystemCommunicator(out_dict=out_dict,
+                                                n_input_channels=sd['n_input_channels'],
+                                                channels_of_interest_inds=sd['channels_of_interest_inds'],
+                                                n_timepoints_per_sample=sd['n_timepoints_per_sample'],
+                                                max_sfsystem_output=sd['max_sfsystem_output'],
+                                                reward_formula_string=sd['reward_formula_string'],
+                                                fbins=sd['fbins'],
+                                                delay=sd['delay'],
+                                                use_raw_in_os_def=sd['use_raw_in_os_def'],
+                                                use_freq_in_os_def=sd['use_freq_in_os_def'],
+                                                use_fbins_in_os_def=sd['use_fbins_in_os_def'],
+                                                device_address=sd['device_address'],
+                                                step_stim_length_millis=sd['step_stim_length_millis'],
+                                                episode_time_seconds=sd['episode_time_seconds'],
+                                                logfn=sd['logfn'],
+                                                log_steps=sd['log_steps'],
+                                                log_episodes=sd['log_episodes'],
+                                                log_best_actions_final=sd['log_best_actions_final'],
+                                                signal_plot_width=sd['signal_plot_width'],
+                                                signal_plot_height=sd['signal_plot_height'],
+                                                training_plot_width=sd['training_plot_width'],
+                                                training_plot_height=sd['training_plot_height'],
+                                                write_raw=sd['write_raw'],
+                                                write_fft=sd['write_fft'],
+                                                write_bins=sd['write_bins'],
+                                                log_best_actions_every_episode=sd['log_best_actions_every_episode'],
+                                                render_data=sd['render_data'],
+                                                render_each_step=sd['render_each_step'],
+                                                log_actions_every_step=sd['log_actions_every_step'],
+                                                stim_length_on_reset=sd['stim_length_on_reset'],
+                                                colors=sigplot_colors)
 
-    env = SFSystemCommunicator(out_dict=out_dict,
+                #print(sd)
+            #print(out_dict)
+            #env.step(env.action_space.sample()) #sample step
+        trainer=stable_baselines_model_trainer(initialized_environment=env,
+                                                            algorithm=sd['algorithm'],
+                                                            policy='MlpPolicy',
+                                                            logfn='model_stats.log',
+                                                            n_steps_per_timestep=sd['n_steps_per_timestep'])
+            
+
+        training_args={
+                'num_episodes':sd['num_episodes'],
+                'log_model':sd['log_model'],
+                'n_total_timesteps':sd['n_total_timesteps'],
+                'log_or_plot_every_n_timesteps':sd['log_or_plot_every_n_timesteps'],
+                'jnb':False
+                
+            }
+    
+    if trigger_id =='start_session_train':
+          #print(sd)
+          #print(out_dict)
+          #env.step(env.action_space.sample()) #sample step
+          #print(training_args)
+          training_thread = threading.Thread(target=start_training, args=(training_args,))
+          training_thread.daemon = True
+          training_thread.start()
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis
+    if trigger_id=="start_session_static":
+          training_thread = threading.Thread(target=start_session_static)
+          training_thread.daemon = True
+          training_thread.start()
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis    
+    if trigger_id=="start_session_notrain":
+          training_thread = threading.Thread(target=start_session_notrain, args=({'n_steps_notrain':n_steps_notrain},))
+          training_thread.daemon = True
+          training_thread.start()
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis
+    if trigger_id=="run_trained":
+        envstats=get_state_from_model_logfile('model_stats.log')
+        out_dict=envstats['out_dict']
+        sd_s=envstats['session_settings']
+        for key in sd.keys():
+            if key in sd_s.keys():
+                sd[key]=sd_s[key]
+
+        env = SFSystemCommunicator(out_dict=out_dict,
                                               n_input_channels=sd['n_input_channels'],
                                               channels_of_interest_inds=sd['channels_of_interest_inds'],
                                               n_timepoints_per_sample=sd['n_timepoints_per_sample'],
@@ -435,54 +529,50 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                               render_each_step=sd['render_each_step'],
                                               log_actions_every_step=sd['log_actions_every_step'],
                                               stim_length_on_reset=sd['stim_length_on_reset'],
-                                              colors=sigplot_colors)
+                                              colors=sigplot_colors)    
+        trainer=stable_baselines_model_trainer(initialized_environment=env,
+                                                            algorithm=sd['algorithm'],
+                                                            policy='MlpPolicy',
+                                                            logfn='model_stats.log',
+                                                            n_steps_per_timestep=sd['n_steps_per_timestep'])
+        trainer.load_model(model_name)
+        training_thread = threading.Thread(target=start_session_trained_model, args=({'n_steps_notrain':n_steps_notrain},))
+        training_thread.daemon = True
+        training_thread.start()
 
-              #print(sd)
-          #print(out_dict)
-          #env.step(env.action_space.sample()) #sample step
-    trainer=stable_baselines_model_trainer(initialized_environment=env,
-                                                          algorithm=sd['algorithm'],
-                                                          policy='MlpPolicy',
-                                                          logfn='model_stats.log',
-                                                          n_steps_per_timestep=sd['n_steps_per_timestep'])
-          
-
-    training_args={
-              'num_episodes':sd['num_episodes'],
-              'log_model':sd['log_model'],
-              'n_total_timesteps':sd['n_total_timesteps'],
-              'log_or_plot_every_n_timesteps':sd['log_or_plot_every_n_timesteps'],
-              'jnb':False
-              
-          }
+        return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis
     
-    if trigger_id =='start_session_train':
-          #print(sd)
-          #print(out_dict)
-          #env.step(env.action_space.sample()) #sample step
-          #print(training_args)
-          training_thread = threading.Thread(target=start_training, args=(training_args,))
-          training_thread.daemon = True
-          training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval
-    if trigger_id=="start_session_static":
-          training_thread = threading.Thread(target=start_session_static)
-          training_thread.daemon = True
-          training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval    
-    if trigger_id=="start_session_notrain":
-          training_thread = threading.Thread(target=start_session_notrain, args=({'n_steps_notrain':n_steps_notrain},))
-          training_thread.daemon = True
-          training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval 
     if trigger_id=="stop_session_train":
-        trainer.close_env()
-        return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval
+        try:
+            trainer.close_env()
+        except Exception as e:
+            print(f"On session stop received: {e}")
+            try:
+                env.close()
+            except Exception as e:
+                print(f"On environment stop received: {e}")
+        return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval, b_vis
 
           
 
-          
-
+def start_session_trained_model(arg):
+    global env
+    global trainer
+    nsteps_notrain=arg['n_steps_notrain']
+    while nsteps_notrain>0:
+        try:
+            obs=trainer.env.reset()[0]
+            action, _states = trainer.model.predict(obs, deterministic=True)
+            obs, reward, done, info = trainer.env.step(action)
+            nsteps_notrain-=1
+        except Exception as e:
+            n_steps_notrain=0
+            print(f"Training thread terminated: {e}")
+            try:
+                trainer.env.close()
+            except Exception as e:
+                print(f"On environment closure: {e}")
+            break
 
 
          
@@ -506,7 +596,7 @@ def start_session_static():
         try:
             trainer.env.close()
         except Exception as e:
-            print(f"On environment closue: {e}")
+            print(f"On environment closure: {e}")
 def start_session_notrain(arg):
     global env
     global trainer
@@ -521,7 +611,7 @@ def start_session_notrain(arg):
             try:
                 trainer.env.close()
             except Exception as e:
-                print(f"On environment closue: {e}")
+                print(f"On environment closure: {e}")
             break
             
 
