@@ -37,9 +37,11 @@ WebSocketsServer webSocket = WebSocketsServer(80);
 #define LED_PIN 13  
 #define SDA 21
 #define SCL 22
-#define ENC_CLK 33
+#define ENC_CLK 35
 #define ENC_DT 32
-#define ENC_SW 35
+#define ENC_SW 33
+
+
 
 #define I2S_BCK 14;
 #define I2S_WS 15;
@@ -229,7 +231,8 @@ uint8_t led_brightness = 100; //The brightness is a value between 0 (min brightn
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 //Encoder setup
-Encoder enc(ENC_CLK, ENC_DT, ENC_SW);
+Encoder enc(ENC_CLK, ENC_DT);
+//Encoder enc(ENC_CLK, ENC_DT, ENC_SW, TYPE1);
 
 
 //Custom functions
@@ -467,6 +470,7 @@ void setup() {
   Wire.setPins(SDA, SCL);
   Wire.begin();
   Serial.begin(115200); 
+  enc.setType(TYPE1); 
   config_audio();
   //some random default values
   wave_1_freq=220;
@@ -594,16 +598,35 @@ int ch5_vals[MAX_SAMPLES];
 int ch6_vals[MAX_SAMPLES];
 int ch7_vals[MAX_SAMPLES];
 int ch8_vals[MAX_SAMPLES];
+int ch9_vals[MAX_SAMPLES]; //encoder
 int sample_count = 0; // variable to keep track of the number of samples taken
 
 
 
-
-
+int enc_val_prev = 0;
+int enc_val_n = 0;
+int enc_val_diff = 0;
 
 void loop() {
+  enc.tick();
+  //Serial.println(444);
+  if (enc.isRight()) enc_val_n++;      // если был поворот направо, увеличиваем на 1
+  if (enc.isLeft()) enc_val_n--;     // если был поворот налево, уменьшаем на 1
+  if (enc.isRightH()) enc_val_n += 5;  // если было удержание + поворот направо, увеличиваем на 5
+  if (enc.isLeftH()) enc_val_n -= 5; // если было удержание + поворот налево, уменьшаем на 5  
+  //Serial.println(enc_val_n);
   webSocket.loop();
   if (data_transfer && sample_count < n_datapoints) {
+    enc.tick();
+    if (enc.isRight()) enc_val_n++;      // если был поворот направо, увеличиваем на 1
+    if (enc.isLeft()) enc_val_n--;     // если был поворот налево, уменьшаем на 1
+    if (enc.isRightH()) enc_val_n += 5;  // если было удержание + поворот направо, увеличиваем на 5
+    if (enc.isLeftH()) enc_val_n -= 5; // если было удержание + поворот налево, уменьшаем на 5  
+    // Serial.println(111);
+    // Serial.println(enc_val_n);
+    // Serial.println(222);
+    // Serial.println(enc_val_prev);
+    enc_val_diff=enc_val_n-enc_val_prev;
     int ch1_val=ads.adcValues[ 0 ];
     int ch2_val=ads.adcValues[ 1 ];
     int ch3_val=ads.adcValues[ 2 ];
@@ -612,6 +635,7 @@ void loop() {
     int ch6_val=ads.adcValues[ 5 ];
     int ch7_val=ads.adcValues[ 6 ];
     int ch8_val=ads.adcValues[ 7 ];
+    int enc_val=enc_val_diff;
 
     // store the sampled values in the arrays
     ch1_vals[sample_count] = ch1_val;
@@ -622,10 +646,11 @@ void loop() {
     ch6_vals[sample_count] = ch6_val;
     ch7_vals[sample_count] = ch7_val;
     ch8_vals[sample_count] = ch8_val;
+    ch9_vals[sample_count] = enc_val;
 
     // increment the sample count
     sample_count++;
-
+    enc_val_prev=enc_val_n;
     //some delay
     delay(delay_length);
 
@@ -684,6 +709,13 @@ void loop() {
       jsonMessage += "],\"ch8\":[";
       for (int i = 0; i < n_datapoints; i++) {
         jsonMessage += ch8_vals[i];
+        if (i < n_datapoints - 1) {
+          jsonMessage += ",";
+        }
+      }
+      jsonMessage += "],\"ch9\":[";
+      for (int i = 0; i < n_datapoints; i++) {
+        jsonMessage += ch9_vals[i];
         if (i < n_datapoints - 1) {
           jsonMessage += ",";
         }
