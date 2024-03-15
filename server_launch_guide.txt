@@ -1,0 +1,9 @@
+gunicorn app:server -b 0.0.0.0:8050
+
+To know the IP address of the server:
+hostname -I 
+10.10.100.99 10.42.0.1
+
+Try entering:
+http://10.42.0.1:8050 or http://10.10.100.99:8050
+The first likely works
