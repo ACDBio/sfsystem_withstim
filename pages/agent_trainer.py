@@ -322,6 +322,8 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Button("Store session data", id="move_data", style=b_vis, n_clicks=0),
                 ' ',
                 html.Button("Clear session library", id="clear_session_lib", style=b_vis, n_clicks=0),
+                ' ',
+                html.Button("Clear trainer results to last 10 points", id="clear_trainer_data", style=b_vis, n_clicks=0),
                 html.Br(),
                 'Session name: ',
                 dcc.Input(type='text', placeholder='Session name (old data, if present, will be overwritten)', value='default_session', id='session_name', size=30),]),
@@ -345,6 +347,18 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
           
 )
           ])                                        
+
+@callback(
+    Output("clear_trainer_data", "n_clicks"),
+    Input("clear_trainer_data", "n_clicks"),
+    prevent_initial_call=True
+)
+def toggle_offcanvas_scrollable(n1):
+    global env
+    global trainer
+    trainer.env.previous_episodes_max_rewards=trainer.env.previous_episodes_max_rewards[-10:]
+    trainer.env.previous_episodes_total_rewards=trainer.env.previous_episodes_max_rewards[-10:]
+    return n1
 
 @callback(
     Output('formula_instructions', "is_open"),
@@ -500,12 +514,12 @@ def collect_settings(n_intervals, runtype):
     if runtype=='train':
         messages=[f'Trainer episode N {trainer.cur_episode_no+1} (progress {int(trainer.cur_episode_no*100/trainer.num_episodes)}%)',
               html.Br(),
-              f'Reward: {env.reward_cur} ',
-              f'Episode max reward: {env.episode_max_reward} ',
-              f'Overall max reward: {env.overall_max_reward} ',
+              f'Reward: {trainer.env.reward} ',
+              f'Episode max reward: {trainer.env.episode_max_reward} ',
+              f'Overall max reward: {trainer.env.overall_max_reward} ',
               html.Br(),
-              f'Total current episode reward: {env.total_cur_episode_reward} ',
-              f'Total total episode max reward: {env.total_episode_max_reward} ',
+              f'Total current episode reward: {trainer.env.total_cur_episode_reward} ',
+              f'Total total episode max reward: {trainer.env.total_episode_max_reward} ',
               html.Br(),
               f'Environment step N {trainer.env.cur_step} (progress {int(trainer.env.cur_step*100/trainer.env.n_steps_per_episode)}%)',
                 html.Br(),

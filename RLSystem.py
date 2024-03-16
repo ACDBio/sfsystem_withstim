@@ -110,6 +110,7 @@ class SFSystemCommunicator(gym.Env):
         self.n_timepoints_per_sample=n_timepoints_per_sample
         self.n_input_channels=n_input_channels
         self.reward_formula_string=reward_formula_string
+        self.reward=None
 
         self.delay=delay
 
