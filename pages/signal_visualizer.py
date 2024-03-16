@@ -1341,15 +1341,15 @@ def websocket_communication(server_message, start_communication, n_intervals, si
 
 
                 #Use for data generation:
-                sampling_freq=signal_acquisition_options['sampling_freq']
-                tstep=1/sampling_freq
-                signal_freq=30
-                n_samples=signal_acquisition_options['n_samples']  #int(sampling_freq/signal_freq)
-                time_steps=np.linspace(0, (n_samples-1)*tstep, n_samples)
-                fstep=sampling_freq/n_samples
-                f=np.linspace(0, (n_samples-1)*fstep, n_samples)
-                y=1*np.sin(2*np.pi*signal_freq*time_steps)
-                cdata=y
+                #sampling_freq=signal_acquisition_options['sampling_freq']
+                #tstep=1/sampling_freq
+                # signal_freq=30
+                #n_samples=signal_acquisition_options['n_samples']  #int(sampling_freq/signal_freq)
+                #time_steps=np.linspace(0, (n_samples-1)*tstep, n_samples)
+                #fstep=sampling_freq/n_samples
+                #f=np.linspace(0, (n_samples-1)*fstep, n_samples)
+                # y=1*np.sin(2*np.pi*signal_freq*time_steps) #uncomment for  synthesized signal usage
+                # cdata=y
                 if log_all_channels:
                     updates[f'{chname}_raw_current']=cdata
                 else:

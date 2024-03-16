@@ -690,6 +690,12 @@ class stable_baselines_model_trainer():
         self.max_test_reward=0
         self.logfn=logfn
         self.collect_environment_data()
+        self.cur_episode_no=None
+        self.stat1=None
+        self.stat2=None
+        self.n_total_timesteps=None
+        self.num_episodes=None
+        self.training_completed=False
         if not os.path.isfile(self.logfn):
             open(self.logfn, 'a').close()
         with open(self.logfn, 'a') as log_file:
@@ -722,11 +728,14 @@ class stable_baselines_model_trainer():
         self.env.close()
 
     def train(self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps=1, log_or_plot_every_n_timesteps=1, jnb=False):
+        self.n_total_timesteps=n_total_timesteps
+        self.num_episodes=num_episodes
         if self.env.ws.sock is not None:
             self.training_completed=False
             #if n_total_timesteps=='episode':
             #    n_total_timesteps=int(self.env.n_steps_per_episode/self.n_steps_per_timestep) #we run one episode + 1 step before resetting, episode 
             for i in range(num_episodes):
+                self.cur_episode_no=i
                 self.cur_n_timesteps=0
                 while self.cur_n_timesteps<int(n_total_timesteps): #here-for A2C
                     if self.env.ws.sock is not None:
@@ -743,11 +752,13 @@ class stable_baselines_model_trainer():
                             if self.env.best_overall_reward_now:
                                 self.model.save("best_overall_reward_model")
                                 with open(self.logfn, 'a') as log_file:
-                                    log_file.write(f'target {self.env.reward_formula_string}, current best_overall_reward_model reward {self.env.overall_max_reward}, file best_overall_reward_model' + '\n')
+                                    self.stat1=f'target {self.env.reward_formula_string}, current best_overall_reward_model reward {self.env.overall_max_reward}, file best_overall_reward_model'
+                                    log_file.write(self.stat1 + '\n')
                             if self.env.best_total_episode_reward_now:
                                 self.model.save("best_total_episode_reward_model")
                                 with open(self.logfn, 'a') as log_file:
-                                    log_file.write(f'target {self.env.reward_formula_string}, current best_total_episode_reward_model reward {self.env.total_episode_max_reward}, file best_total_episode_reward_model' + '\n')
+                                    self.stat2=f'target {self.env.reward_formula_string}, current best_total_episode_reward_model reward {self.env.total_episode_max_reward}, file best_total_episode_reward_model'
+                                    log_file.write(self.stat2 + '\n')
                     
                         self.env.clear_all_stats()
                     else:

@@ -17,7 +17,8 @@ dash.register_page(__name__,'/')
 #d_vis={'color': 'Black', 'font-size': 20}
 b_vis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'inline-block'}
 b_invis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'none'}
-layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
+layout=html.Div([dbc.Row(justify="start", id='message_row', children=[]),
+                 dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
     dcc.Store(id='settings_dictionary',data=None),
     dcc.Interval(id='training_status_update', disabled=True, n_intervals=0, max_intervals=-1),
     dbc.Row(justify="start", children=[dcc.Markdown("##### Audiovisual space setup"),
@@ -152,7 +153,7 @@ layout=html.Div([dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
                 dcc.Markdown('Data processing and usage settings'),  
                 html.Hr(),              
                 'Reward formula: ',
-                dcc.Input(type='text', placeholder='Formula string', value='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', id='formula_string', size='50'),  
+                dcc.Input(type='text', placeholder='Formula string', value='raw_ch8', id='formula_string', size='50'),  
                 html.Br(),
                 'Observational space data types: ',
                 dcc.Checklist(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Raw signal values','Frequency spectra', 'Frequency bin values'], id='observational_space_datatypes'),
@@ -322,6 +323,11 @@ def change_defaults(dm, vol):
     if dm=='Set fully blank defaults':
         return ['0,0,0' for i in range(8)]+[0]
     
+
+
+
+
+
 @callback(Output('clear_logfiles', 'children'),
           Input('clear_logfiles', 'n_clicks'),
           State('clear_logfiles', 'children'),
@@ -342,10 +348,12 @@ def clear_logfiles(n_clicks, ch, logfn):
 
 @callback(Output('training_figure_container', "children"),
           Output('signal_figure_container', "children"),
+          Output('message_row', 'children'),
           Input('training_status_update', 'n_intervals'),
           prevent_initial_call=True)
 def collect_settings(n_intervals):
     global env
+    global trainer
     #print(env.figures)
 
     training_fig=dcc.Graph(id=f'training_figure',
@@ -354,8 +362,16 @@ def collect_settings(n_intervals):
     signal_fig=dcc.Graph(id=f'training_figure',
                     figure=env.figures['signal_fig'],
                     config={'staticPlot': False},)
-                    
-    return training_fig, signal_fig
+    messages=[f'Trainer episode N {trainer.cur_episode_no+1} (progress {int(trainer.cur_episode_no*100/trainer.num_episodes)}%)',
+              html.Br(),
+              f'Environment step N {trainer.env.cur_step} (progress {int(trainer.env.cur_step*100/trainer.env.n_steps_per_episode)}%)',
+                html.Br(),
+                f'{trainer.stat1} {trainer.stat2}',
+                html.Br(),
+                f'Best action overall: {trainer.env.best_action_overall} (reward {trainer.env.overall_max_reward})',
+                html.Br(),
+                f'Training completion: {trainer.training_completed}.']                
+    return training_fig, signal_fig, messages
 
 @callback(Output('signal_plot_color','value'),
           Input("color_resample", 'n_clicks'),
