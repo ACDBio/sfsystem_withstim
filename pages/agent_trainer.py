@@ -179,6 +179,33 @@ layout=html.Div(
                 html.Hr(),              
                 'Reward formula: ',
                 dcc.Input(type='text', placeholder='Formula string', value='raw_ch8', id='formula_string', size='50'),  
+                ' ',
+                dbc.Button("Help", id="open_formula_instructions", n_clicks=0),    
+                dbc.Offcanvas(children=[
+                        html.P('Reward formula can use the following operators: //, *, **, -, +'),
+                        html.P('It can refer to channels using "ch" prefix followed by an index (starting with 0) e.g. ch0'),
+                        html.P('It can refer to values of frequency bins in specific channels e.g. fbin_10_50_ch0'),
+                        html.P('The corresponding freqency bins must be present among fbins passed at the initialization step'),
+                        html.P('fbins should be passed in the form of [(b1 min, b1max),...(bn min, bn max)]'),
+                        html.P('It can refer to specific frequencies from fft e.g. freq_50_ch0'),
+                        html.P('It can refer to total sum or raw signal values in a sample raw_ch8'),
+                        html.P('Use integers for frequencies, fractions are not supported for now'),
+                        html.P('Some examples:'),
+                        html.P('1. (freq_50_ch0+fbin_0_10_ch0)/(fbin_20_30_ch0)'),
+                        html.P('2. freq_5_ch0/freq_10_ch0'),
+                        html.P('3. fbin_05_5_ch0'),
+                        html.P('4. raw_ch0'),
+                        html.P('ch8 is the encoder channel'),
+                ],
+                  id='formula_instructions',
+                  title='Instructions',
+                  is_open=False,
+                  placement="start",
+                  scrollable=True,
+                 # style={'width':'95%'},
+                ),
+
+
                 html.Br(),
                 'Observational space data types: ',
                 dcc.Checklist(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Raw signal values','Frequency spectra', 'Frequency bin values'], id='observational_space_datatypes'),
@@ -262,7 +289,7 @@ layout=html.Div(
             dcc.Input(type='number', placeholder='N steps', value=360, id='n_steps_notrain', size=30),
             html.Br(),
             'Model location for upload (for the corresponding regimen): ',
-            dcc.Input(type='text', placeholder='session name/model name', value='default_session/best_overall_reward_model.zip', id='model_name', size=30),]), 
+            dcc.Input(type='text', placeholder='session name/model name', value='default_session/best_total_episode_reward_model.zip', id='model_name', size=30),]), 
             offcanvas_session_lib,
             html.Div(children=[
             html.Button("Run training session", id="start_session_train", style=b_vis, n_clicks=0),
@@ -318,6 +345,18 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
           
 )
           ])                                        
+
+@callback(
+    Output('formula_instructions', "is_open"),
+    Input("open_formula_instructions", "n_clicks"),
+    State('formula_instructions', "is_open"),
+)
+def toggle_offcanvas_scrollable(n1, is_open):
+    if n1:
+        return not is_open
+    return is_open
+
+
 
 @callback(
     Output('plot_panel', "is_open"),
