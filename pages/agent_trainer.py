@@ -17,7 +17,9 @@ dash.register_page(__name__,'/')
 #d_vis={'color': 'Black', 'font-size': 20}
 b_vis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'inline-block'}
 b_invis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'none'}
-layout=html.Div([dbc.Row(justify="start", id='message_row', children=[]),
+layout=html.Div(
+    [dcc.Store(id='run_type', data=None),
+     dbc.Row(justify="start", id='message_row', children=[]),
                  dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
     dcc.Store(id='settings_dictionary',data=None),
     dcc.Interval(id='training_status_update', disabled=True, n_intervals=0, max_intervals=-1),
@@ -36,6 +38,7 @@ layout=html.Div([dbc.Row(justify="start", id='message_row', children=[]),
             dcc.Input(type='number', value=1000, placeholder='Max frequency, Hz', id='flash_frequency_ub'), 
             html.Div('Initial value'),
             dcc.Input(type='number', value=100, placeholder='Initial frequency, Hz', id='flash_frequency_iv')]),
+
             
             dbc.Col(width='auto',children=['Individual LED controls',
                               html.Br(),
@@ -350,19 +353,21 @@ def clear_logfiles(n_clicks, ch, logfn):
           Output('signal_figure_container', "children"),
           Output('message_row', 'children'),
           Input('training_status_update', 'n_intervals'),
+          State('run_type', 'data'),
           prevent_initial_call=True)
-def collect_settings(n_intervals):
+def collect_settings(n_intervals, runtype):
     global env
     global trainer
     #print(env.figures)
-
     training_fig=dcc.Graph(id=f'training_figure',
                     figure=env.figures['training_fig'],
                     config={'staticPlot': False},)
     signal_fig=dcc.Graph(id=f'training_figure',
                     figure=env.figures['signal_fig'],
                     config={'staticPlot': False},)
-    messages=[f'Trainer episode N {trainer.cur_episode_no+1} (progress {int(trainer.cur_episode_no*100/trainer.num_episodes)}%)',
+    messages=[]
+    if runtype=='train':
+        messages=[f'Trainer episode N {trainer.cur_episode_no+1} (progress {int(trainer.cur_episode_no*100/trainer.num_episodes)}%)',
               html.Br(),
               f'Environment step N {trainer.env.cur_step} (progress {int(trainer.env.cur_step*100/trainer.env.n_steps_per_episode)}%)',
                 html.Br(),
@@ -370,8 +375,9 @@ def collect_settings(n_intervals):
                 html.Br(),
                 f'Best action overall: {trainer.env.best_action_overall} (reward {trainer.env.overall_max_reward})',
                 html.Br(),
-                f'Training completion: {trainer.training_completed}.']                
+                f'Training completion: {trainer.training_completed}']            
     return training_fig, signal_fig, messages
+
 
 @callback(Output('signal_plot_color','value'),
           Input("color_resample", 'n_clicks'),
@@ -404,6 +410,7 @@ def get_state_from_model_logfile(logfile=None):
           Output('training_status_update', 'disabled'),
           Output('training_status_update', 'interval'),
           Output("run_trained", "style"),
+          Output("run_type", "data"),
 
           
           Input("start_session_train", "n_clicks"),
@@ -496,7 +503,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
           training_thread = threading.Thread(target=start_training, args=(training_args,))
           training_thread.daemon = True
           training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train'
     if trigger_id=="start_session_static":
           training_thread = threading.Thread(target=start_session_static)
           training_thread.daemon = True
@@ -506,7 +513,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
           training_thread = threading.Thread(target=start_session_notrain, args=({'n_steps_notrain':n_steps_notrain},))
           training_thread.daemon = True
           training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'notrain'
     if trigger_id=="run_trained":
         envstats=get_state_from_model_logfile('model_stats.log')
         out_dict=envstats['out_dict']
@@ -554,9 +561,11 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         trainer.load_model(model_name)
         training_thread = threading.Thread(target=start_session_trained_model, args=({'n_steps_notrain':n_steps_notrain},))
         training_thread.daemon = True
+        n_notrain=n_steps_notrain
+
         training_thread.start()
 
-        return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis
+        return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'log'
     
     if trigger_id=="stop_session_train":
         try:
@@ -567,7 +576,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                 env.close()
             except Exception as e:
                 print(f"On environment stop received: {e}")
-        return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval, b_vis
+        return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop'
 
           
 
@@ -576,6 +585,7 @@ def start_session_trained_model(arg):
     global trainer
     nsteps_notrain=arg['n_steps_notrain']
     while nsteps_notrain>0:
+        n_notrain=nsteps_notrain
         try:
             obs=trainer.env.reset()[0]
             action, _states = trainer.model.predict(obs, deterministic=True)
