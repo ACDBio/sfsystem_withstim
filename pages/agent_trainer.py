@@ -9,6 +9,8 @@ import random
 import os
 import json
 from dash.exceptions import PreventUpdate
+import shutil
+
 
 dash.register_page(__name__,'/')
 
@@ -19,6 +21,7 @@ b_vis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'd
 b_invis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'none'}
 layout=html.Div(
     [dcc.Store(id='run_type', data=None),
+     dcc.Store(id='session_library', data=os.listdir('./session_lib')),
      dbc.Row(justify="start", id='message_row', children=[]),
                  dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
     dcc.Store(id='settings_dictionary',data=None),
@@ -239,8 +242,8 @@ layout=html.Div(
             'Step count for a dynamic notrain session or a trained model run: ',
             dcc.Input(type='number', placeholder='N steps', value=360, id='n_steps_notrain', size=30),
             html.Br(),
-            'Model name for upload (for the corresponding regimen): ',
-            dcc.Input(type='text', placeholder='Model name', value='best_overall_reward_model.zip', id='model_name', size=30),]), 
+            'Model location for upload (for the corresponding regimen): ',
+            dcc.Input(type='text', placeholder='session name/model name', value='default_session/best_overall_reward_model.zip', id='model_name', size=30),]), 
             html.Div(children=[
             html.Button("Run training session", id="start_session_train", style=b_vis, n_clicks=0),
             ' ',
@@ -264,7 +267,13 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Button("Resample colors", id="color_resample", style=b_vis, n_clicks=0),
                 ' ',
                 html.Button("Clear logs", id="clear_logfiles", style=b_vis, n_clicks=0),
-                 ]),
+                ' ',
+                html.Button("Copy session data to library", id="move_data", style=b_vis, n_clicks=0),
+                ' ',
+                'Session name: ',
+                dcc.Input(type='text', placeholder='Session name (old data, if present, will be overwritten)', value='default_session', id='session_name', size=30),]),
+                ' ',
+                html.Button("Clear session library", id="clear_session_lib", style=b_vis, n_clicks=0),
                   html.Br(),
                   html.Div(id='training_figure_container', children=[]),
                   html.Br(),
@@ -327,8 +336,30 @@ def change_defaults(dm, vol):
         return ['0,0,0' for i in range(8)]+[0]
     
 
+def copy_file(source_file_path, destination_folder_path):
+    shutil.copy(source_file_path, destination_folder_path)
+@callback(Output('session_library', 'data'),
+          Input("move_data", 'n_clicks'),
+          State('session_name', 'value'),
+          prevent_initial_call=True)
+def copy_session_logs_to_lib(n_clicks, sname):
+    session_dir=f'./session_lib/{sname}'
+    if os.path.isdir(session_dir):
+        os.rmtree(session_dir)
+    os.mkdir(session_dir)
+    cfiles=os.listdir('./')
+    for f in cfiles:
+        if f in ['current_training.log', 'model_stats.log','best_total_episode_reward_model.zip','best_overall_reward_model.zip']:
+            copy_file(f'./{f}', session_dir)
+    return os.listdir('./session_lib')
 
-
+@callback(Output('session_library', 'data', allow_duplicate=True),
+          Input("clear_session_lib", 'n_clicks'),
+          prevent_initial_call=True)
+def clear_session_lib(n_clicks):
+    os.rmtree('./session_lib')
+    os.mkdir('./session_dir')
+    return os.listdir('./session_lib')
 
 
 @callback(Output('clear_logfiles', 'children'),
@@ -377,6 +408,7 @@ def collect_settings(n_intervals, runtype):
                 html.Br(),
                 f'Training completion: {trainer.training_completed}']            
     return training_fig, signal_fig, messages
+
 
 
 @callback(Output('signal_plot_color','value'),
@@ -515,7 +547,11 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
           training_thread.start()
           return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'notrain'
     if trigger_id=="run_trained":
-        envstats=get_state_from_model_logfile('model_stats.log')
+        tkns=model_name.split('/')
+        session_name=tkns[0]
+        model_name=tkns[1]
+
+        envstats=get_state_from_model_logfile(f'session_lib/{session_name}/model_stats.log')
         out_dict=envstats['out_dict']
         sd_s=envstats['session_settings']
         for key in sd.keys():
@@ -558,7 +594,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                             policy='MlpPolicy',
                                                             logfn='model_stats.log',
                                                             n_steps_per_timestep=sd['n_steps_per_timestep'])
-        trainer.load_model(model_name)
+        trainer.load_model(f'session_lib/{session_name}/{model_name}')
         training_thread = threading.Thread(target=start_session_trained_model, args=({'n_steps_notrain':n_steps_notrain},))
         training_thread.daemon = True
         n_notrain=n_steps_notrain
