@@ -275,7 +275,11 @@ layout=html.Div(
             ' ',
             html.Button("Run additional episodes", id="additional_session", style=b_invis, n_clicks=0),
             ' ',
-            html.Button("Run trained model", id="run_trained", style=b_vis, n_clicks=0) ])])
+            html.Button("Run trained model", id="run_trained", style=b_vis, n_clicks=0),
+            html.Br(),
+            'Additional options for running the trained model: ',
+            dcc.Checklist(options=['Train the logged model with the original settings'], value=[], id='train_logged_orig'),
+             dcc.Checklist(options=['Train the logged model with the new settings'], value=[], id='train_logged_new'), ])])
 ]),
 dbc.Col(children=[dcc.Markdown("### Session Data"),
                  html.Div(id='plot_style_container', children=[
@@ -500,9 +504,11 @@ def get_state_from_model_logfile(logfile=None):
           State('signal_plot_color','value'),
           State('n_steps_notrain','value'),
           State('model_name', 'value'),
+          State('train_logged_orig', 'value'),
+          State('train_logged_new', 'value'),
           prevent_initial_call=True)
 def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, setd, info_upd_interval, sigplot_color, n_steps_notrain,
-                     model_name):
+                     model_name, train_logged_orig, train_logged_new):
     global env
     global trainer
     trigger = ctx.triggered[0]
@@ -516,7 +522,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         sigplot_colors=[sigplot_color for i in range(sd['n_input_channels'])]
 
 
-    if trigger_id in ['start_session_train', "start_session_static","start_session_notrain"]:
+    if trigger_id in ['start_session_train', "start_session_static", "start_session_notrain"]:
         env = SFSystemCommunicator(out_dict=out_dict,
                                                 n_input_channels=sd['n_input_channels'],
                                                 channels_of_interest_inds=sd['channels_of_interest_inds'],
@@ -587,17 +593,39 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
           training_thread.daemon = True
           training_thread.start()
           return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'notrain'
+    if trigger_id=="additional_session":
+        #we collect training arguments in case they changed and run the same trainer
+        #we do not initialize either new environment or new trainer
+        training_args={
+                'num_episodes':sd['num_episodes'],
+                'log_model':sd['log_model'],
+                'n_total_timesteps':sd['n_total_timesteps'],
+                'log_or_plot_every_n_timesteps':sd['log_or_plot_every_n_timesteps'],
+                'jnb':False
+                
+        }
+        training_thread = threading.Thread(target=start_training, args=(training_args,))
+        training_thread.daemon = True
+        training_thread.start()
+        return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train'
+
     if trigger_id=="run_trained":
         tkns=model_name.split('/')
         session_name=tkns[0]
         model_name=tkns[1]
 
         envstats=get_state_from_model_logfile(f'session_lib/{session_name}/model_stats.log')
+        
+  
         out_dict=envstats['out_dict']
         sd_s=envstats['session_settings']
         for key in sd.keys():
             if key in sd_s.keys():
-                sd[key]=sd_s[key]
+                if len(train_logged_new)==0:
+                    sd[key]=sd_s[key]
+                else:
+                    if key in ['delay', 'n_steps_per_timestep', 'num_episodes', 'n_total_timesteps', 'log_or_plot_every_n_timesteps']: #options which can be changed
+                        sd[key]=sd_s[key]
 
         env = SFSystemCommunicator(out_dict=out_dict,
                                               n_input_channels=sd['n_input_channels'],
@@ -636,13 +664,29 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                             logfn='model_stats.log',
                                                             n_steps_per_timestep=sd['n_steps_per_timestep'])
         trainer.load_model(f'session_lib/{session_name}/{model_name}')
-        training_thread = threading.Thread(target=start_session_trained_model, args=({'n_steps_notrain':n_steps_notrain},))
-        training_thread.daemon = True
-        n_notrain=n_steps_notrain
+        print('MODEL LOADED')
+        if len(train_logged_orig)==0 and len(train_logged_new)==0:
+            training_thread = threading.Thread(target=start_session_trained_model, args=({'n_steps_notrain':n_steps_notrain},))
+            training_thread.daemon = True
+            training_thread.start()
+            return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'log'
+        else:
+            trainer.set_model_environment() #if we want to train, we need to connect the model to the environment
+            training_args={
+                'num_episodes':sd['num_episodes'],
+                'log_model':sd['log_model'],
+                'n_total_timesteps':sd['n_total_timesteps'],
+                'log_or_plot_every_n_timesteps':sd['log_or_plot_every_n_timesteps'],
+                'jnb':False
+                
+            }
+            print(training_args)
+            training_thread = threading.Thread(target=start_training, args=(training_args,))
+            print('STARTED THREAD')
+            training_thread.daemon = True
+            training_thread.start()
 
-        training_thread.start()
-
-        return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'log'
+            return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train'
     
     if trigger_id=="stop_session_train":
         try:

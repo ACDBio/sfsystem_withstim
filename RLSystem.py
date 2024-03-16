@@ -802,6 +802,8 @@ class stable_baselines_model_trainer():
         return envdata
     def load_model(self, model_path):
         self.model=self.model_blank.load(model_path)
+    def set_model_environment(self):
+        self.model.set_env(self.env)
     def no_training_model_run(self):
         obs=self.env.reset()[0]
         done=False
