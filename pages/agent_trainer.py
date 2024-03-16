@@ -664,7 +664,6 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                             logfn='model_stats.log',
                                                             n_steps_per_timestep=sd['n_steps_per_timestep'])
         trainer.load_model(f'session_lib/{session_name}/{model_name}')
-        print('MODEL LOADED')
         if len(train_logged_orig)==0 and len(train_logged_new)==0:
             training_thread = threading.Thread(target=start_session_trained_model, args=({'n_steps_notrain':n_steps_notrain},))
             training_thread.daemon = True
@@ -680,9 +679,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                 'jnb':False
                 
             }
-            print(training_args)
             training_thread = threading.Thread(target=start_training, args=(training_args,))
-            print('STARTED THREAD')
             training_thread.daemon = True
             training_thread.start()
 
