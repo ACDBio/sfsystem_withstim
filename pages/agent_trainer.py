@@ -41,7 +41,7 @@ offcanvas_session_lib = html.Div(
 layout=html.Div(
     [dcc.Store(id='run_type', data=None),
      dcc.Store(id='session_library', data=os.listdir('./session_lib')),
-     dbc.Row(justify="start", id='message_row', children=[]),
+     #dbc.Row(justify="start", id='message_row', children=[]),
                  dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
     dcc.Store(id='settings_dictionary',data=None),
     dcc.Interval(id='training_status_update', disabled=True, n_intervals=0, max_intervals=-1),
@@ -298,20 +298,36 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Br(),
                 'Session name: ',
                 dcc.Input(type='text', placeholder='Session name (old data, if present, will be overwritten)', value='default_session', id='session_name', size=30),]),
-   
-                
-                  html.Br(),
+                html.Br(),
+                dbc.Button("Show session data", id="open_plot_panel", n_clicks=0),    
+                dbc.Offcanvas(children=[html.Br(),
+                 dbc.Row(justify="start", id='message_row', children=[]),
                   html.Div(id='training_figure_container', children=[]),
                   html.Br(),
                   html.Div(id='signal_figure_container', children=[]),
-                  html.Br(),
-                  
+                  html.Br(),],
+                  id='plot_panel',
+                  title='Session plots',
+                  is_open=False,
+                  placement="end",
+                  scrollable=True,
+                  style={'width':'95%'},
+                ),
                   
                   ])]      
           
 )
           ])                                        
 
+@callback(
+    Output('plot_panel', "is_open"),
+    Input("open_plot_panel", "n_clicks"),
+    State('plot_panel', "is_open"),
+)
+def toggle_offcanvas_scrollable(n1, is_open):
+    if n1:
+        return not is_open
+    return is_open
 
 @callback(
     Output("offcanvas_session_lib", "is_open"),
@@ -587,7 +603,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
           training_thread = threading.Thread(target=start_session_static)
           training_thread.daemon = True
           training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis    
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'static'    
     if trigger_id=="start_session_notrain":
           training_thread = threading.Thread(target=start_session_notrain, args=({'n_steps_notrain':n_steps_notrain},))
           training_thread.daemon = True
