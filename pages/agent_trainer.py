@@ -19,6 +19,25 @@ dash.register_page(__name__,'/')
 #d_vis={'color': 'Black', 'font-size': 20}
 b_vis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'inline-block'}
 b_invis={"padding": "1rem 1rem", "margin-top": "2rem", "margin-bottom": "1rem", 'display':'none'}
+
+offcanvas_session_lib = html.Div(
+    [
+        dbc.Button(
+            "Show saved session list",
+            id="open_session_lib",
+            n_clicks=0,
+        ),
+        dbc.Offcanvas(
+            html.P(""),
+            id="offcanvas_session_lib",
+            scrollable=True,
+            title="Session library",
+            is_open=False,
+        ),
+    ]
+)
+
+
 layout=html.Div(
     [dcc.Store(id='run_type', data=None),
      dcc.Store(id='session_library', data=os.listdir('./session_lib')),
@@ -244,6 +263,7 @@ layout=html.Div(
             html.Br(),
             'Model location for upload (for the corresponding regimen): ',
             dcc.Input(type='text', placeholder='session name/model name', value='default_session/best_overall_reward_model.zip', id='model_name', size=30),]), 
+            offcanvas_session_lib,
             html.Div(children=[
             html.Button("Run training session", id="start_session_train", style=b_vis, n_clicks=0),
             ' ',
@@ -285,6 +305,25 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
           
 )
           ])                                        
+
+
+@callback(
+    Output("offcanvas_session_lib", "is_open"),
+    Input("open_session_lib", "n_clicks"),
+    State("offcanvas_session_lib", "is_open"),
+)
+def toggle_offcanvas_scrollable(n1, is_open):
+    if n1:
+        return not is_open
+    return is_open
+
+@callback(
+    Output("offcanvas_session_lib", "children"),
+    Input('session_library', "data"),
+)
+def populate_session_lib_offcanvas(data):
+    return [html.P(item) for item in data]
+
 
 def get_random_css_color_names(n, seed=333):
     """
