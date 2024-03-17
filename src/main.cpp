@@ -630,6 +630,7 @@ void loop() {
     if (enc.isLeftH()) enc_val_n -= 5;
   }
   enc_cum_val_whilenodtransfer+=enc_val_n;
+  enc_val_n = 0;
 
   webSocket.loop();
   if (data_transfer && sample_count < n_datapoints) {
@@ -644,7 +645,7 @@ void loop() {
       if (enc.isLeftH()) enc_val_n -= 5;
     }
     // Serial.println(111);
-    Serial.println(enc_val_n);
+    //Serial.println(enc_val_n);
     // Serial.println(222);
     // Serial.println(enc_val_prev);
     //enc_val_diff=enc_val_n-enc_val_prev;
@@ -660,7 +661,7 @@ void loop() {
 
     enc_cum_val_whilenodtransfer=0;
     enc_val_n=0;
-    
+
     // store the sampled values in the arrays
     ch1_vals[sample_count] = ch1_val;
     ch2_vals[sample_count] = ch2_val;
