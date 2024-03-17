@@ -91,9 +91,14 @@ class SFSystemCommunicator(gym.Env):
                  log_actions_every_step=True,
                  render_each_step=True,
                  colors=color_names, 
-                 stim_length_on_reset=10):
+                 stim_length_on_reset=10,
+                 use_abs_values_for_raw_data_in_reward=False,
+                 only_pos_encoder_mode=True):
+        self.use_abs_values_for_raw_data_in_reward=use_abs_values_for_raw_data_in_reward
+        self.only_pos_encoder_mode=only_pos_encoder_mode
         self.colors=colors
         self.stim_length_on_reset=stim_length_on_reset
+
 
         self.device_address=device_address
         self.step_stim_length_millis=step_stim_length_millis
@@ -155,6 +160,8 @@ class SFSystemCommunicator(gym.Env):
         self.connect()
         print(self.connection_status)
         self.set_delay_and_data_transfer_buffer_size()
+        if self.only_pos_encoder_mode:
+            self.set_pos_encoder_mode()
         print('Delay and data transfer buffer size are set up.')
         self.set_default_actions()
         print('Default actions are set.')
@@ -272,6 +279,8 @@ class SFSystemCommunicator(gym.Env):
             if tartype=='raw':
                 tarobs=observations['raw_data']
                 tarobs=tarobs[:,tarchannelidx]
+                if self.use_abs_values_for_raw_data_in_reward==True:
+                    tarobs=np.abs(tarobs)
                 res=np.sum(tarobs) #here we use the sum, but this may be changed
             if tartype=='freq':
                 #tarfreq=tokendata['freqdata']
@@ -319,6 +328,14 @@ class SFSystemCommunicator(gym.Env):
         self.ws=websocket.WebSocket()
         self.ws.connect(self.device_address)
         self.connection_status=self.ws.recv()
+    def set_pos_encoder_mode(self):
+        self.ws.send('use_only_pos_enc_mode')
+        msg=self.ws.recv()
+        print(msg)
+    def set_use_directional_enc_mode(self):
+        self.ws.send('use_directional_enc_mode')
+        msg=self.ws.recv()
+        print(msg)
     
     def get_fft_fromsignal(self, raw_singlech):
         X=np.fft.fft(raw_singlech)
