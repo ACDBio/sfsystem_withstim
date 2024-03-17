@@ -181,6 +181,9 @@ layout=html.Div(
                 dcc.Input(type='text', placeholder='Formula string', value='raw_ch8', id='formula_string', size='50'),  
                 ' ',
                 dbc.Button("Help", id="open_formula_instructions", n_clicks=0),    
+                html.Br(),
+                dcc.Checklist(options=['Use absolute raw values in reward calculation',
+                                       'Use directionality-agnostic encoder mode'], value=['Use directionality-agnostic encoder mode'], id='data_proc_options'),
                 dbc.Offcanvas(children=[
                         html.P('Reward formula can use the following operators: //, *, **, -, +'),
                         html.P('It can refer to channels using "ch" prefix followed by an index (starting with 0) e.g. ch0'),
@@ -629,6 +632,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 render_each_step=sd['render_each_step'],
                                                 log_actions_every_step=sd['log_actions_every_step'],
                                                 stim_length_on_reset=sd['stim_length_on_reset'],
+                                                only_pos_encoder_mode=sd['only_pos_encoder_mode'],
+                                                use_abs_values_for_raw_data_in_reward=sd['use_abs_values_for_raw_data_in_reward'],
                                                 colors=sigplot_colors)
 
                 #print(sd)
@@ -733,6 +738,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                               render_each_step=sd['render_each_step'],
                                               log_actions_every_step=sd['log_actions_every_step'],
                                               stim_length_on_reset=sd['stim_length_on_reset'],
+                                              only_pos_encoder_mode=sd['only_pos_encoder_mode'],
+                                              use_abs_values_for_raw_data_in_reward=sd['use_abs_values_for_raw_data_in_reward'],
                                               colors=sigplot_colors)    
         trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                             algorithm=sd['algorithm'],
@@ -890,6 +897,7 @@ def start_session_notrain(arg):
               Input('training_plot_height', 'value'),
               Input('render_data','value'),
               Input('stim_length_on_reset','value'),
+              Input('data_proc_options', 'value'),
               prevent_initial_call=False)
 def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
                      l1c,l2c,l3c,l4c,l5c,l6c,l7c,l8c,sound_wave_frange,
@@ -903,7 +911,7 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
                      logging_plotting_opts,
                      log_or_plot_every_n_timesteps, algorithm, n_steps_per_timestep, obs_space_opts,
                      signal_plot_width, signal_plot_height,training_plot_width,training_plot_height, render_data,
-                     stim_length_on_reset):
+                     stim_length_on_reset, data_proc_options):
     ffminf=1000/ffminf #delay = 1000 ms/ n flashes per second
     ffmaxf=1000/ffmaxf
     ffinitf=1000/ffinitf
@@ -916,6 +924,19 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
     w2sh=code_wave_shapes(w2sh)
     
     session_settings_dict={}
+    if 'Use absolute raw values in reward calculation' in data_proc_options:
+        use_abs_values_for_raw_data_in_reward=True
+    else:
+        use_abs_values_for_raw_data_in_reward=False
+    session_settings_dict['use_abs_values_for_raw_data_in_reward']=use_abs_values_for_raw_data_in_reward
+
+    if 'Use directionality-agnostic encoder mode' in data_proc_options:
+        only_pos_encoder_mode=True
+    else:
+        only_pos_encoder_mode=False
+    session_settings_dict['only_pos_encoder_mode']=only_pos_encoder_mode
+
+
     session_settings_dict['n_input_channels']=n_input_channels
     session_settings_dict['channels_of_interest_inds']=list(map(int, channels_of_interest_inds.split(',')))
     session_settings_dict['n_timepoints_per_sample']=n_timepoints_per_sample

@@ -312,7 +312,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
               maximilian.setVolume(0.0); //turn off the sounds
 
             };
-            if (strcmp((const char*)payload, "only_pos_enc_mode") == 0) {
+            if (strcmp((const char*)payload, "receive_output_control_data") == 0) {
               data_transfer = false;
               set_data_transfer_buffer = false;
               set_delay = false;
