@@ -268,6 +268,7 @@ bool receive_outputcontrol_data;
 bool run_led_cycle;
 int leddelay;
 bool use_leddelay;
+bool only_pos_enc_mode;
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
   clientID = num;
@@ -284,6 +285,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 data_transfer = false;
                 set_data_transfer_buffer = false;
                 set_delay = false;
+                only_pos_enc_mode = false;
 				// send message to client
 				webSocket.sendTXT(num, "Connected");
             }
@@ -310,13 +312,21 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
               maximilian.setVolume(0.0); //turn off the sounds
 
             };
-            if (strcmp((const char*)payload, "receive_output_control_data") == 0) {
+            if (strcmp((const char*)payload, "only_pos_enc_mode") == 0) {
               data_transfer = false;
               set_data_transfer_buffer = false;
               set_delay = false;
               set_delay_and_data_transfer_buffer_step1 = false;
               set_delay_and_data_transfer_buffer_step2 = false;
               receive_outputcontrol_data = true;
+            };
+            if (strcmp((const char*)payload, "use_only_pos_enc_mode") == 0) {
+              only_pos_enc_mode  = true;
+              webSocket.sendTXT(num, "Encoder data will be used regardless of rotation direction");
+            };
+            if (strcmp((const char*)payload, "use_directional_enc_mode") == 0) {
+              only_pos_enc_mode  = false;
+              webSocket.sendTXT(num, "Encoder direction of rotation will be considered");
             };
             if (receive_outputcontrol_data){
               int l1r, l1g, l1b, l2r, l2g, l2b, l3r, l3g, l3b, l4r, l4g, l4b, l5r, l5g, l5b, l6r, l6g, l6b, l7r, l7g, l7b, l8r, l8g ,l8b, ld, w1f, w2f, pf, pd, ph1f, ph1dif, ph1min, ph2f, ph2dif, ph2min, vol, w1t, w2t;
@@ -603,30 +613,41 @@ int sample_count = 0; // variable to keep track of the number of samples taken
 
 
 
-int enc_val_prev = 0;
+//int enc_val_prev = 0;
 int enc_val_n = 0;
-int enc_val_diff = 0;
-
+//int enc_val_diff = 0;
+int enc_cum_val_whilenodtransfer=0;
 void loop() {
   enc.tick();
   //Serial.println(444);
-  if (enc.isRight()) enc_val_n++;      // если был поворот направо, увеличиваем на 1
-  if (enc.isLeft()) enc_val_n--;     // если был поворот налево, уменьшаем на 1
-  if (enc.isRightH()) enc_val_n += 5;  // если было удержание + поворот направо, увеличиваем на 5
-  if (enc.isLeftH()) enc_val_n -= 5; // если было удержание + поворот налево, уменьшаем на 5  
-  //Serial.println(enc_val_n);
+  if (enc.isRight()) enc_val_n++;     
+  if (enc.isRightH()) enc_val_n += 5;  
+  if (only_pos_enc_mode){
+    if (enc.isLeft()) enc_val_n++; 
+    if (enc.isLeftH()) enc_val_n += 5;  
+  } else {
+    if (enc.isLeft()) enc_val_n--;     
+    if (enc.isLeftH()) enc_val_n -= 5;
+  }
+  enc_cum_val_whilenodtransfer+=enc_val_n;
+
   webSocket.loop();
   if (data_transfer && sample_count < n_datapoints) {
     enc.tick();
-    if (enc.isRight()) enc_val_n++;      // если был поворот направо, увеличиваем на 1
-    if (enc.isLeft()) enc_val_n--;     // если был поворот налево, уменьшаем на 1
-    if (enc.isRightH()) enc_val_n += 5;  // если было удержание + поворот направо, увеличиваем на 5
-    if (enc.isLeftH()) enc_val_n -= 5; // если было удержание + поворот налево, уменьшаем на 5  
+    if (enc.isRight()) enc_val_n++;     
+    if (enc.isRightH()) enc_val_n += 5;  
+    if (only_pos_enc_mode){
+      if (enc.isLeft()) enc_val_n++; 
+      if (enc.isLeftH()) enc_val_n += 5;  
+    } else {
+      if (enc.isLeft()) enc_val_n--;     
+      if (enc.isLeftH()) enc_val_n -= 5;
+    }
     // Serial.println(111);
-    // Serial.println(enc_val_n);
+    Serial.println(enc_val_n);
     // Serial.println(222);
     // Serial.println(enc_val_prev);
-    enc_val_diff=enc_val_n-enc_val_prev;
+    //enc_val_diff=enc_val_n-enc_val_prev;
     int ch1_val=ads.adcValues[ 0 ];
     int ch2_val=ads.adcValues[ 1 ];
     int ch3_val=ads.adcValues[ 2 ];
@@ -635,8 +656,11 @@ void loop() {
     int ch6_val=ads.adcValues[ 5 ];
     int ch7_val=ads.adcValues[ 6 ];
     int ch8_val=ads.adcValues[ 7 ];
-    int enc_val=enc_val_diff;
+    int enc_val=enc_val_n+enc_cum_val_whilenodtransfer;
 
+    enc_cum_val_whilenodtransfer=0;
+    enc_val_n=0;
+    
     // store the sampled values in the arrays
     ch1_vals[sample_count] = ch1_val;
     ch2_vals[sample_count] = ch2_val;
@@ -650,7 +674,8 @@ void loop() {
 
     // increment the sample count
     sample_count++;
-    enc_val_prev=enc_val_n;
+    
+    //enc_val_prev=enc_val_n;
     //some delay
     delay(delay_length);
 
