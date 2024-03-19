@@ -428,12 +428,12 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 set_delay_and_data_transfer_buffer_step2 = false;
               }
             };       
-            if (strcmp((const char*)payload, "display_text") == 0) {
+            if (strncmp((const char*)payload, "display_text:", 13) == 0) {
                 // Assuming the text to display is sent after the command
                 // You may need to adjust this based on how you send the text
                 turnOnDisplay();
 
-                String textToDisplay = (const char*)payload;
+                String textToDisplay = String((const char*)payload + 13);
                 Serial.println(textToDisplay);
                 display.clearDisplay();
                 display.setTextSize(1);
@@ -443,7 +443,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 
                 // Update the display
                 display.display();
-                delay(3000);
             }
             break;
         case WStype_BIN:
