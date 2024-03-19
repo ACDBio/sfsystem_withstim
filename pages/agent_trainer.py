@@ -560,7 +560,6 @@ def clear_logfiles(n_clicks, ch, logfn):
 def run_timer(n_intervals, reward_thresh):
     #print(n_intervals)
     global env
-    print('In TIMER REG')
     if reward_thresh==-1:
         env.step(env.default_actions)
         env.stop_audiovis_feedback()
