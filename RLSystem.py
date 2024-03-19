@@ -752,6 +752,7 @@ class stable_baselines_model_trainer():
         self.default_env_actions=self.env.flatten_and_normalize_action(self.orig_env.action_space, self.env.default_actions)
 
     def direct_feedback_run(self, reward_mapping_min, reward_mapping_max, overlay_random, mapped_outputs, min_space_value=-1, max_space_value=1):
+        #dont forget to run at least one iteration of the environment for reward setup
         reward=self.env.reward
         reward_scaled=(reward-reward_mapping_min)/(reward_mapping_max-reward_mapping_min)
         action_modifier=min_space_value+(max_space_value-min_space_value)*reward_scaled
