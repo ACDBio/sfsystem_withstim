@@ -685,7 +685,38 @@ class FlattenActionSpaceWrapper(gym.Wrapper):
         return super().step(unnormalized_action)
 
 
-
+    def flatten_and_normalize_action(self, action_space, action, min_value=None, max_value=None):
+        """
+        Flattens and normalizes a given unflattened and unnormalized action for a gym environment with a dictionary action space.
+        
+        Parameters:
+        - action_space: A dictionary where keys represent different action components and values are Box objects from gym.
+        - action: The action to be flattened and normalized.
+        
+        Returns:
+        - The flattened and normalized action.
+        """
+        if str(min_value)=='None':
+            min_value=self.min_value
+        if str(max_value)=='None':
+            max_value=self.max_value
+        # Initialize an empty list to store the normalized action
+        normalized_action = []
+        
+        # Iterate over each component in the action space
+        for component in action_space:
+            space=action_space[component]
+            # Extract the low and high bounds of the Box
+            low, high = space.low[0], space.high[0]
+            
+            # Normalize the action component based on its own range
+            normalized_value = min_value + (action[component] - low) * (max_value - min_value) / (high - low)
+            normalized_value=normalized_value[0]
+            normalized_value = max(min(normalized_value, max_value), min_value)
+            # Append the normalized value to the normalized action list
+            normalized_action.append(normalized_value)
+        
+        return np.array(normalized_action)
 
 
     
@@ -718,10 +749,9 @@ class stable_baselines_model_trainer():
             open(self.logfn, 'a').close()
         with open(self.logfn, 'a') as log_file:
             log_file.write(json.dumps(self.env_data) + '\n')
-        self.default_env_actions=self.env.default_actions
+        self.default_env_actions=self.env.flatten_and_normalize_action(self.orig_env.action_space, self.env.default_actions)
 
     def direct_feedback_run(self, reward_mapping_min, reward_mapping_max, overlay_random, mapped_outputs, min_space_value=-1, max_space_value=1):
-        self.env.step()
         reward=self.env.reward
         reward_scaled=(reward-reward_mapping_min)/(reward_mapping_max-reward_mapping_min)
         action_modifier=min_space_value+(max_space_value-min_space_value)*reward_scaled

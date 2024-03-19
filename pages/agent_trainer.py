@@ -289,7 +289,7 @@ layout=html.Div(
             html.Br(),
             html.Div(children=['Session data update minimal interval: ',
             dcc.Input(type='number', placeholder='interval, ms', value=1000, id='info_upd_interval', size=30),
-            ' ',
+            html.Br(),
             'Step count for a dynamic notrain session, trained model run, or direct feedback: ',
             dcc.Input(type='number', placeholder='N steps', value=360, id='n_steps_notrain', size=30),
             html.Br(),
@@ -916,11 +916,13 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
 def start_session_direct_feedback(arg):
     global env
     global trainer
+    env.step(env.default_actions)
     nsteps_notrain=arg['n_steps_notrain']
     reward_mapping_min=arg['reward_mapping_min']
     reward_mapping_max=arg['reward_mapping_max']
     overlay_random=arg['overlay_random']
     mapped_outputs=arg['mapped_outputs']
+    print('HERE')
     while nsteps_notrain>0:
         try:
             trainer.direct_feedback_run(reward_mapping_min, reward_mapping_max, overlay_random, mapped_outputs, min_space_value=-1, max_space_value=1)
