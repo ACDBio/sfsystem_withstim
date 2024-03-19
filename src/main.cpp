@@ -443,7 +443,12 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 
                 // Update the display
                 display.display();
-            }
+            };
+            if (strcmp((const char*)payload, "turn_off_display") == 0) {
+                // Assuming the text to display is sent after the command
+                // You may need to adjust this based on how you send the text
+                turnOffDisplay();
+            };
             break;
         case WStype_BIN:
             Serial.printf("[%u] get binary length: %u\n", num, length);
