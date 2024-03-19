@@ -418,10 +418,7 @@ def toggle_offcanvas_scrollable(n_clicks_st, n_clicks_cd, text):
     trigger = ctx.triggered[0]
     trigger_id = trigger['prop_id'].split('.')[0]
     msg='display_text:'+text
-    print(msg)
     if 'env' in globals():
-        print('in glob env true')
-        print(trigger_id)
         global env
         if trigger_id=="send_display_text":
             env.ws.send(msg)
@@ -429,8 +426,6 @@ def toggle_offcanvas_scrollable(n_clicks_st, n_clicks_cd, text):
             env.ws.send("turn_off_display")
     else:
         env = SFSystemCommunicator()
-        print('in glob env false')
-        print(trigger_id)
         if trigger_id=="send_display_text":
             env.ws.send(msg)
         else:
@@ -607,13 +602,17 @@ def clear_logfiles(n_clicks, ch, logfn):
 @callback(Output('message_row', 'children', allow_duplicate=True),
           Input('timer_interval', 'n_intervals'),
           State('timer_reward_threshold', 'value'),
+          State('oled_text', 'value'),  #oled text will also be displayed
           prevent_initial_call=True)
-def run_timer(n_intervals, reward_thresh):
+def run_timer(n_intervals, reward_thresh, text):
     #print(n_intervals)
+    msg='display_text:'+text
     global env
+    env.ws.send(msg)
     if reward_thresh==-1:
         env.step(env.default_actions)
         env.stop_audiovis_feedback()
+        env.ws.send("turn_off_display")
         return [f'Timer signal has run {n_intervals} times']
     else:
         obs=env.sample_and_process_observations_from_device()
@@ -621,6 +620,7 @@ def run_timer(n_intervals, reward_thresh):
         if reward>reward_thresh:
             env.step(env.default_actions)
             env.stop_audiovis_feedback()
+            env.ws.send("turn_off_display")
             return [f'Timer signal has run {n_intervals} times']
 
 @callback(Output('training_figure_container', "children"),
