@@ -718,6 +718,56 @@ class stable_baselines_model_trainer():
             open(self.logfn, 'a').close()
         with open(self.logfn, 'a') as log_file:
             log_file.write(json.dumps(self.env_data) + '\n')
+        self.default_env_actions=self.env.default_actions
+
+    def direct_feedback_run(self, reward_mapping_min, reward_mapping_max, overlay_random, mapped_outputs, min_space_value=-1, max_space_value=1):
+        self.env.step()
+        reward=self.env.reward
+        reward_scaled=(reward-reward_mapping_min)/(reward_mapping_max-reward_mapping_min)
+        action_modifier=min_space_value+(max_space_value-min_space_value)*reward_scaled
+        if action_modifier>1: #just in case
+            action_modifier=1
+
+        if overlay_random==False:
+            new_actions=self.default_env_actions
+        else:
+            new_actions=self.env.action_space.sample()
+        rgbidxs=list(range(1,25))
+        r_idxs=list(range(1,25,3))
+        g_idxs=list(range(2,25,3))
+        b_idxs=list(range(3,25,3))
+        #rgbkeys=['lv1r','lv1g','lv1b','lv2r','lv2g','lv2b','lv3r','lv3g','lv3b','lv4r','lv4g','lv4b','lv5r','lv5g','lv5b','lv6r','lv6g','lv6b','lv7r','lv7g','lv7b','lv8r','lv8g','lv8b']
+        for ma in mapped_outputs:
+            if ma!='Flash frequency':
+                action_modifier=min_space_value+(max_space_value-min_space_value)*reward_scaled
+            else:
+                action_modifier=max_space_value-(max_space_value-min_space_value)*reward_scaled
+            if ma=='Flash frequency':
+                new_actions[0]=action_modifier
+            if ma=='LED intensity':
+                for idx in rgbidxs:
+                    new_actions[idx]=action_modifier
+            if ma=='R':
+                for idx in r_idxs:
+                    new_actions[idx]=action_modifier
+            if ma=='G':
+                for idx in g_idxs:
+                    new_actions[idx]=action_modifier
+            if ma=='B':
+                for idx in b_idxs:
+                    new_actions[idx]=action_modifier
+            if ma=='Wave 1 frequency':
+                new_actions[25]=action_modifier   
+            if ma=='Wave 2 frequency':
+                new_actions[26]=action_modifier
+            if ma=='Panner freq':
+                new_actions[27] = action_modifier
+            if ma=='Sound volume':
+                new_actions[37] = action_modifier
+
+        self.env.step(new_actions)
+        return
+
     def static_launch(self):
         self.orig_env.step(self.orig_env.default_actions)
     def dynamic_launch(self):
