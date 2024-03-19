@@ -326,7 +326,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 ' ',
                 html.Button("Clear session library", id="clear_session_lib", style=b_vis, n_clicks=0),
                 ' ',
-                html.Button("Clear trainer results to last 10 points", id="clear_trainer_data", style=b_vis, n_clicks=0),
+                html.Button("Clear trainer results to the last 10 points", id="clear_trainer_data", style=b_vis, n_clicks=0),
                 html.Br(),
                 'Session name: ',
                 dcc.Input(type='text', placeholder='Session name (old data, if present, will be overwritten)', value='default_session', id='session_name', size=30),]),
@@ -345,7 +345,37 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                   scrollable=True,
                   style={'width':'95%'},
                 ),
-                  
+                html.Br(),
+                html.Br(),
+                html.Div(children=[
+                dcc.Markdown("#### Deterministic modes"),
+                html.Hr(),
+                dcc.Markdown("##### Timer"),
+     
+                'Timer interval: ',
+                dcc.Input(type='number', placeholder='N minutes', value=90, id='timer_interval_mins', size=30),
+                html.Br(),   
+                'Timer signal duration: ',    
+                dcc.Input(type='number', placeholder='N seconds', value=60, id='timer_signal_duration_s', size=30),     
+                html.Br(),          
+                html.Button("Run timer", id="run_timer", style=b_vis, n_clicks=0),  
+                html.Button("Stop timer", id="stop_timer", style=b_invis, n_clicks=0),  
+                dcc.Markdown("##### Direct feedback"),
+    
+                'Set reward to modulate: ',
+                dcc.Dropdown(options=['Flash frequency',
+                                      'RGB intensity',
+                                      'R',
+                                      'G',
+                                      'B',
+                                      'Wave 1 frequency',
+                                      'Wave 2 frequency',
+                                      'Panner div',
+                                      'Sound volume'], value=['R'], id='deterministic_opts', multi=True), 
+                html.Br(),   
+                html.Button("Run direct feedback", id="run_direct_feedback", style=b_vis, n_clicks=0),
+                html.Button("Stop direct feedback", id="stop_direct_feedback", style=b_invis, n_clicks=0), ],
+                style={"width": "50%"},) 
                   ])]      
           
 )
@@ -568,6 +598,11 @@ def get_state_from_model_logfile(logfile=None):
           Output("run_trained", "style"),
           Output("run_type", "data"),
 
+          Output("run_timer", "style"),
+          Output("stop_timer", "style"),
+          Output("run_direct_feedback", "style"),
+          Output("stop_direct_feedback", "style"),
+
           
           Input("start_session_train", "n_clicks"),
           Input("start_session_notrain", "n_clicks"),
@@ -575,6 +610,8 @@ def get_state_from_model_logfile(logfile=None):
           Input("stop_session_train", "n_clicks"),
           Input("additional_session", "n_clicks"),
           Input("run_trained", "n_clicks"),
+          Input("run_timer","n_clicks"),
+          Input("run_direct_feedback","n_clicks"),
 
 
 
@@ -585,9 +622,15 @@ def get_state_from_model_logfile(logfile=None):
           State('model_name', 'value'),
           State('train_logged_orig', 'value'),
           State('train_logged_new', 'value'),
+          State('timer_interval_mins','value'),
+          State('timer_signal_duration_s','value'),
+          State('deterministic_opts','value'),
           prevent_initial_call=True)
-def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, setd, info_upd_interval, sigplot_color, n_steps_notrain,
-                     model_name, train_logged_orig, train_logged_new):
+def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, setd, info_upd_interval, sigplot_color, n_steps_notrain,
+                     model_name, train_logged_orig, train_logged_new, 
+                     timer_interval_mins,
+                     timer_signal_duration_s,
+                     deterministic_opts):
     global env
     global trainer
     trigger = ctx.triggered[0]
@@ -663,17 +706,17 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
           training_thread = threading.Thread(target=start_training, args=(training_args,))
           training_thread.daemon = True
           training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train'
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train', b_invis, b_invis, b_invis, b_invis
     if trigger_id=="start_session_static":
           training_thread = threading.Thread(target=start_session_static)
           training_thread.daemon = True
           training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'static'    
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'static', b_invis, b_invis, b_invis, b_invis
     if trigger_id=="start_session_notrain":
           training_thread = threading.Thread(target=start_session_notrain, args=({'n_steps_notrain':n_steps_notrain},))
           training_thread.daemon = True
           training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'notrain'
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'notrain', b_invis, b_invis, b_invis, b_invis
     if trigger_id=="additional_session":
         #we collect training arguments in case they changed and run the same trainer
         #we do not initialize either new environment or new trainer
@@ -688,7 +731,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         training_thread = threading.Thread(target=start_training, args=(training_args,))
         training_thread.daemon = True
         training_thread.start()
-        return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train'
+        return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train', b_invis, b_invis, b_invis, b_invis
 
     if trigger_id=="run_trained":
         tkns=model_name.split('/')
@@ -751,7 +794,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
             training_thread = threading.Thread(target=start_session_trained_model, args=({'n_steps_notrain':n_steps_notrain},))
             training_thread.daemon = True
             training_thread.start()
-            return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'log'
+            return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'log', b_invis, b_invis, b_invis, b_invis
         else:
             trainer.set_model_environment() #if we want to train, we need to connect the model to the environment
             training_args={
@@ -766,7 +809,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
             training_thread.daemon = True
             training_thread.start()
 
-            return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train'
+            return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train', b_invis, b_invis, b_invis, b_invis
     
     if trigger_id=="stop_session_train":
         try:
@@ -777,7 +820,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                 env.close()
             except Exception as e:
                 print(f"On environment stop received: {e}")
-        return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop'
+        return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop', b_vis, b_invis, b_vis, b_invis
 
           
 
