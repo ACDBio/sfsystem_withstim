@@ -398,6 +398,9 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                     cols=128, # Adjust the number of columns as needed
                 ),
                 html.Br(),
+                'Text size: ',
+                dcc.Input(type='number', placeholder='1,2,3 etc.', value=2, id='text_size'),  
+                html.Br(),
                 html.Button("Send to display", id="send_display_text", style=b_vis, n_clicks=0),
                 html.Button("Clear display (if anything present)", id="clear_display", style=b_vis, n_clicks=0),                 
                 ],
@@ -412,12 +415,13 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
     Input("send_display_text", "n_clicks"),
     Input("clear_display", "n_clicks"),
     State('oled_text', 'value'),
+    State('text_size','value'),
     prevent_initial_call=True
 )
-def toggle_offcanvas_scrollable(n_clicks_st, n_clicks_cd, text):
+def toggle_offcanvas_scrollable(n_clicks_st, n_clicks_cd, text, text_size):
     trigger = ctx.triggered[0]
     trigger_id = trigger['prop_id'].split('.')[0]
-    msg='display_text:'+text
+    msg='display_text:'+str(text_size)+':'+text
     if 'env' in globals():
         global env
         if trigger_id=="send_display_text":
@@ -603,10 +607,11 @@ def clear_logfiles(n_clicks, ch, logfn):
           Input('timer_interval', 'n_intervals'),
           State('timer_reward_threshold', 'value'),
           State('oled_text', 'value'),  #oled text will also be displayed
+          State('text_size', 'value'), 
           prevent_initial_call=True)
-def run_timer(n_intervals, reward_thresh, text):
+def run_timer(n_intervals, reward_thresh, text, text_size):
     #print(n_intervals)
-    msg='display_text:'+text
+    msg='display_text:'+str(text_size)+':'+text
     global env
     env.ws.send(msg)
     if reward_thresh==-1:
