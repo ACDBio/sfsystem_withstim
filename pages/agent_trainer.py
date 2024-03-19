@@ -560,6 +560,7 @@ def clear_logfiles(n_clicks, ch, logfn):
 def run_timer(n_intervals, reward_thresh):
     #print(n_intervals)
     global env
+    print('In TIMER REG')
     if reward_thresh==-1:
         env.step(env.default_actions)
         env.stop_audiovis_feedback()
@@ -886,6 +887,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
     
     if trigger_id=="run_timer":
         print('Timer is started')
+        print(f'Timer query interval: {timer_interval_ms} ms')
         env.stop_audiovis_feedback()
         return b_invis, b_invis, b_invis, b_invis, b_invis, True, info_upd_interval, b_vis, 'run_timer', b_invis, b_vis, b_invis, b_invis, False, timer_interval_ms
     if trigger_id=="stop_timer":
