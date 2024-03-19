@@ -427,7 +427,24 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 webSocket.sendTXT(num, "Delay and data transfer buffer size set up");
                 set_delay_and_data_transfer_buffer_step2 = false;
               }
-            };            
+            };       
+            if (strcmp((const char*)payload, "display_text") == 0) {
+                // Assuming the text to display is sent after the command
+                // You may need to adjust this based on how you send the text
+                turnOnDisplay();
+
+                String textToDisplay = (const char*)payload;
+                Serial.println(textToDisplay);
+                display.clearDisplay();
+                display.setTextSize(1);
+                display.setTextColor(WHITE);
+                display.setCursor(0, 0);
+                display.println(textToDisplay);
+
+                // Update the display
+                display.display();
+                delay(3000);
+            }
             break;
         case WStype_BIN:
             Serial.printf("[%u] get binary length: %u\n", num, length);
