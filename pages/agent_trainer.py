@@ -391,7 +391,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Hr(),
                 dcc.Textarea(
                     id='oled_text',
-                    value='Type the information to display',
+                    value='Information to display',
                     style={'width': '100%', 'height': 300, 'font-size': '14px', 'line-height': '1'},
                     maxLength=1024, # Adjust the maxLength as needed
                     rows=64, # Adjust the number of rows as needed
