@@ -46,6 +46,7 @@ layout=html.Div(
     dcc.Store(id='settings_dictionary',data=None),
     dcc.Interval(id='training_status_update', disabled=True, n_intervals=0, max_intervals=-1),
     dcc.Interval(id='timer_interval', disabled=True, n_intervals=0, max_intervals=-1),
+    dcc.Interval(id='data_cleaning_interval', disabled=True, n_intervals=0, max_intervals=-1),
     dbc.Row(justify="start", children=[dcc.Markdown("##### Audiovisual space setup"),
                       html.Hr(),
                       dbc.Col(width='auto',children=[ 
@@ -346,6 +347,8 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                   scrollable=True,
                   style={'width':'95%'},
                 ),
+                'Clear trainer results every N seconds: ',
+                dcc.Input(type='number', placeholder='Interval, s  (-1 for never)', value=-1, id='clear_trainer_data_n_seconds'), 
                 html.Br(),
                 html.Br(),
                 html.Div(children=[
@@ -386,11 +389,27 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
           ])                                        
 
 @callback(
-    Output("clear_trainer_data", "n_clicks"),
-    Input("clear_trainer_data", "n_clicks"),
+    Output('data_cleaning_interval', "disabled"),
+    Output('data_cleaning_interval', "interval"),
+    Input('clear_trainer_data_n_seconds', "value"),
     prevent_initial_call=True
 )
-def toggle_offcanvas_scrollable(n1):
+def toggle_offcanvas_scrollable(n_seconds):
+    interval=n_seconds*1000
+    if n_seconds==-1:
+        return True, interval
+    else:
+        return False, interval
+
+
+
+@callback(
+    Output("clear_trainer_data", "n_clicks"),
+    Input("clear_trainer_data", "n_clicks"),
+    Input('data_cleaning_interval', "n_intervals"),
+    prevent_initial_call=True
+)
+def toggle_offcanvas_scrollable(n1, n_intervals):
     global env
     global trainer
     trainer.env.previous_episodes_max_rewards=trainer.env.previous_episodes_max_rewards[-10:]
@@ -854,7 +873,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
     if trigger_id=="run_timer":
         print('Timer is started')
         env.stop_audiovis_feedback()
-        return b_invis, b_invis, b_invis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop', b_invis, b_vis, b_invis, b_invis, False, timer_interval_ms
+        return b_invis, b_invis, b_invis, b_invis, b_invis, True, info_upd_interval, b_vis, 'run_timer', b_invis, b_vis, b_invis, b_invis, False, timer_interval_ms
     if trigger_id=="stop_timer":
         try:
             env.close()
