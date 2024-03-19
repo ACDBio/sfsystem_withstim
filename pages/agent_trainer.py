@@ -881,8 +881,18 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         training_thread.daemon = True
         training_thread.start()
 
-        return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'run_direct_feedback', b_invis, b_invis, b_invis, b_invis, True, timer_interval_ms
-
+        return b_invis, b_invis, b_invis, b_invis, b_invis, False, info_upd_interval, b_invis, 'run_direct_feedback', b_invis, b_invis, b_invis, b_vis, True, timer_interval_ms
+    if trigger_id=="stop_direct_feedback":
+        try:
+            trainer.close_env()
+        except Exception as e:
+            print(f"On session stop received: {e}")
+            try:
+                env.close()
+            except Exception as e:
+                print(f"On environment stop received: {e}")
+        return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop', b_vis, b_invis, b_vis, b_invis, True, timer_interval_ms
+        
 def start_session_direct_feedback(arg):
     global env
     global trainer
