@@ -357,12 +357,16 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Hr(),
                 dcc.Markdown("##### Timer"),
      
-                'Timer interval: ',
+                'Timer interval or timer query interval: ',
                 dcc.Input(type='number', placeholder='N minutes', value=90, id='timer_interval_mins', size=30),
                 html.Br(),   
                 'Timer signal duration: ',    
-                dcc.Input(type='number', placeholder='N seconds', value=60, id='timer_signal_duration_s', size=30),     
-                html.Br(),          
+                dcc.Input(type='number', placeholder='N seconds', value=60, id='timer_signal_duration_s', size=30),  
+                html.Br(),    
+                'Timer reward threshold: ',    
+                dcc.Input(type='number', placeholder='Reward value', value=-1, id='timer_reward_threshold', size=30), 
+                html.Br(), 
+
                 html.Button("Run timer", id="run_timer", style=b_vis, n_clicks=0),  
                 html.Button("Stop timer", id="stop_timer", style=b_invis, n_clicks=0),  
                 dcc.Markdown("##### Direct feedback"),
@@ -551,13 +555,22 @@ def clear_logfiles(n_clicks, ch, logfn):
 
 @callback(Output('message_row', 'children', allow_duplicate=True),
           Input('timer_interval', 'n_intervals'),
+          State('timer_reward_threshold', 'value'),
           prevent_initial_call=True)
-def run_timer(n_intervals):
-    print(n_intervals)
+def run_timer(n_intervals, reward_thresh):
+    #print(n_intervals)
     global env
-    env.step(env.default_actions)
-    env.stop_audiovis_feedback()
-    return [f'Timer signal has run {n_intervals} times']
+    if reward_thresh==-1:
+        env.step(env.default_actions)
+        env.stop_audiovis_feedback()
+        return [f'Timer signal has run {n_intervals} times']
+    else:
+        obs=env.sample_and_process_observations_from_device()
+        reward=env.get_reward(observations=obs, toreturn=True)
+        if reward>reward_thresh:
+            env.step(env.default_actions)
+            env.stop_audiovis_feedback()
+            return [f'Timer signal has run {n_intervals} times']
 
 @callback(Output('training_figure_container', "children"),
           Output('signal_figure_container', "children"),
@@ -922,7 +935,6 @@ def start_session_direct_feedback(arg):
     reward_mapping_max=arg['reward_mapping_max']
     overlay_random=arg['overlay_random']
     mapped_outputs=arg['mapped_outputs']
-    print('HERE')
     while nsteps_notrain>0:
         try:
             trainer.direct_feedback_run(reward_mapping_min, reward_mapping_max, overlay_random, mapped_outputs, min_space_value=-1, max_space_value=1)
