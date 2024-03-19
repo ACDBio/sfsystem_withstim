@@ -397,7 +397,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
 def toggle_offcanvas_scrollable(n_seconds):
     interval=n_seconds*1000
     if n_seconds==-1:
-        return True, interval
+        return True, -1
     else:
         return False, interval
 
