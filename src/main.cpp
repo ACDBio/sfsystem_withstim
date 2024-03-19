@@ -431,12 +431,19 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             if (strncmp((const char*)payload, "display_text:", 13) == 0) {
                 // Assuming the text to display is sent after the command
                 // You may need to adjust this based on how you send the text
+
+                char* payload_str = (char*)payload;
+                strtok(payload_str, ":"); // Skip the "display_text" part
+                int text_size = atoi(strtok(NULL, ":")); // Get the text size
+                String textToDisplay = String(strtok(NULL, ":"));
+
                 turnOnDisplay();
 
-                String textToDisplay = String((const char*)payload + 13);
-                Serial.println(textToDisplay);
+                
+                //Serial.println(textToDisplay);
+                //Serial.println(text_size);
                 display.clearDisplay();
-                display.setTextSize(1);
+                display.setTextSize(text_size);
                 display.setTextColor(WHITE);
                 display.setCursor(0, 0);
                 display.println(textToDisplay);
