@@ -386,12 +386,63 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 dcc.Checklist(options=['Overlay random signal'], value=[], id='overlay_random'),               
                 html.Br(),   
                 html.Button("Run direct feedback", id="run_direct_feedback", style=b_vis, n_clicks=0),
-                html.Button("Stop direct feedback", id="stop_direct_feedback", style=b_invis, n_clicks=0), ],
+                html.Button("Stop direct feedback", id="stop_direct_feedback", style=b_invis, n_clicks=0), 
+                dcc.Markdown("#### OLED suggestion setup"),
+                html.Hr(),
+                dcc.Textarea(
+                    id='oled_text',
+                    value='Type the information to display',
+                    style={'width': '100%', 'height': 300, 'font-size': '14px', 'line-height': '1'},
+                    maxLength=1024, # Adjust the maxLength as needed
+                    rows=64, # Adjust the number of rows as needed
+                    cols=128, # Adjust the number of columns as needed
+                ),
+                html.Br(),
+                html.Button("Send to display", id="send_display_text", style=b_vis, n_clicks=0),
+                html.Button("Clear display (if anything present)", id="clear_display", style=b_vis, n_clicks=0),                 
+                ],
                 style={"width": "50%"},) 
                   ])]      
           
 )
           ])                                        
+
+@callback(
+    Output("send_display_text", "n_clicks"),
+    Input("send_display_text", "n_clicks"),
+    Input("clear_display", "n_clicks"),
+    State('oled_text', 'value'),
+    prevent_initial_call=True
+)
+def toggle_offcanvas_scrollable(n_clicks_st, n_clicks_cd, text):
+    trigger = ctx.triggered[0]
+    trigger_id = trigger['prop_id'].split('.')[0]
+    msg='display_text:'+text
+    print(msg)
+    if 'env' in globals():
+        print('in glob env true')
+        print(trigger_id)
+        global env
+        if trigger_id=="send_display_text":
+            env.ws.send(msg)
+        else:
+            env.ws.send("turn_off_display")
+    else:
+        env = SFSystemCommunicator()
+        print('in glob env false')
+        print(trigger_id)
+        if trigger_id=="send_display_text":
+            env.ws.send(msg)
+        else:
+            env.ws.send("turn_off_display")
+        
+
+
+    
+
+
+
+
 
 @callback(
     Output('data_cleaning_interval', "disabled"),
