@@ -289,7 +289,7 @@ layout=html.Div(
             html.Div(children=['Session data update minimal interval: ',
             dcc.Input(type='number', placeholder='interval, ms', value=1000, id='info_upd_interval', size=30),
             ' ',
-            'Step count for a dynamic notrain session or a trained model run: ',
+            'Step count for a dynamic notrain session, trained model run, or direct feedback: ',
             dcc.Input(type='number', placeholder='N steps', value=360, id='n_steps_notrain', size=30),
             html.Br(),
             'Model location for upload (for the corresponding regimen): ',
@@ -365,14 +365,17 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
     
                 'Set reward to modulate: ',
                 dcc.Dropdown(options=['Flash frequency',
-                                      'RGB intensity',
+                                      'LED intensity',
                                       'R',
                                       'G',
                                       'B',
                                       'Wave 1 frequency',
                                       'Wave 2 frequency',
-                                      'Panner div',
+                                      'Panner freq',
                                       'Sound volume'], value=['R'], id='deterministic_opts', multi=True), 
+                'Reward interval to map: ',
+                dcc.Input(type='text', placeholder='min-max', value='0-50', id='reward_mapping_interval'),  
+                dcc.Checklist(options=['Overlay random signal'], value=[], id='overlay_random'),               
                 html.Br(),   
                 html.Button("Run direct feedback", id="run_direct_feedback", style=b_vis, n_clicks=0),
                 html.Button("Stop direct feedback", id="stop_direct_feedback", style=b_invis, n_clicks=0), ],
@@ -624,6 +627,7 @@ def get_state_from_model_logfile(logfile=None):
           Input("run_timer","n_clicks"),
           Input("run_direct_feedback","n_clicks"),
           Input("stop_timer","n_clicks"),
+          Input("stop_direct_feedback","n_clicks"),
           
 
 
@@ -638,12 +642,18 @@ def get_state_from_model_logfile(logfile=None):
           State('timer_interval_mins','value'),
           State('timer_signal_duration_s','value'),
           State('deterministic_opts','value'),
+          State('reward_mapping_interval', 'value'),
+          State('overlay_random', 'value'),
+
           prevent_initial_call=True)
-def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, setd, info_upd_interval, sigplot_color, n_steps_notrain,
+def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, n_clicks_stop_direct_feedback,
+                     setd, info_upd_interval, sigplot_color, n_steps_notrain,
                      model_name, train_logged_orig, train_logged_new, 
                      timer_interval_mins,
                      timer_signal_duration_s,
-                     deterministic_opts):
+                     deterministic_opts,
+                     reward_mapping_interval,
+                     overlay_random):
     global env
     global trainer
     timer_interval_ms=timer_interval_mins*60*1000
@@ -660,7 +670,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         sigplot_colors=[sigplot_color for i in range(sd['n_input_channels'])]
 
 
-    if trigger_id in ['start_session_train', "start_session_static", "start_session_notrain", "run_timer"]:
+    if trigger_id in ['start_session_train', "start_session_static", "start_session_notrain", "run_timer", "run_direct_feedback"]:
         if trigger_id=="run_timer":
             sd['step_stim_length_millis']=timer_signal_duration_s*1000
         env = SFSystemCommunicator(out_dict=out_dict,
@@ -853,8 +863,48 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         print('Timer is stopped')
         return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop', b_vis, b_invis, b_vis, b_invis, True, timer_interval_ms
 
+    if trigger_id=="run_direct_feedback":
 
-          
+        if len(overlay_random)>0:
+            overlay_random=True
+        else:
+            overlay_random=False
+        training_args={
+            'n_steps_notrain':n_steps_notrain,
+            'mapped_outputs':deterministic_opts,
+            'overlay_random':overlay_random,
+            'reward_mapping_min':int(reward_mapping_interval.split('-')[0]),
+            'reward_mapping_max':int(reward_mapping_interval.split('-')[1]),
+        }
+
+        training_thread = threading.Thread(target=start_session_direct_feedback, args=(training_args,))
+        training_thread.daemon = True
+        training_thread.start()
+
+        return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'run_direct_feedback', b_invis, b_invis, b_invis, b_invis, True, timer_interval_ms
+
+def start_session_direct_feedback(arg):
+    global env
+    global trainer
+    nsteps_notrain=arg['n_steps_notrain']
+    reward_mapping_min=arg['reward_mapping_min']
+    reward_mapping_max=arg['reward_mapping_max']
+    overlay_random=arg['overlay_random']
+    mapped_outputs=arg['mapped_outputs']
+    while nsteps_notrain>0:
+        try:
+            trainer.direct_feedback_run(reward_mapping_min, reward_mapping_max, overlay_random, mapped_outputs, min_space_value=-1, max_space_value=1)
+            nsteps_notrain-=1
+        except Exception as e:
+            n_steps_notrain=0
+            print(f"Training thread terminated: {e}")
+            try:
+                trainer.env.close()
+            except Exception as e:
+                print(f"On environment closure: {e}")
+            break
+
+
 
 def start_session_trained_model(arg):
     global env
