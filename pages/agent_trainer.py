@@ -526,10 +526,11 @@ def clear_logfiles(n_clicks, ch, logfn):
         open('model_stats.log', 'a').close()
     return ch
 
-@callback(Output('message_row', 'children'),
+@callback(Output('message_row', 'children', allow_duplicate=True),
           Input('timer_interval', 'n_intervals'),
           prevent_initial_call=True)
 def run_timer(n_intervals):
+    print(n_intervals)
     global env
     env.step(env.default_actions)
     env.stop_audiovis_feedback()
@@ -537,7 +538,7 @@ def run_timer(n_intervals):
 
 @callback(Output('training_figure_container', "children"),
           Output('signal_figure_container', "children"),
-          Output('message_row', 'children'),
+          Output('message_row', 'children', allow_duplicate=True),
           Input('training_status_update', 'n_intervals'),
           State('run_type', 'data'),
           prevent_initial_call=True)
@@ -622,6 +623,7 @@ def get_state_from_model_logfile(logfile=None):
           Input("run_trained", "n_clicks"),
           Input("run_timer","n_clicks"),
           Input("run_direct_feedback","n_clicks"),
+          Input("stop_timer","n_clicks"),
           
 
 
@@ -637,14 +639,16 @@ def get_state_from_model_logfile(logfile=None):
           State('timer_signal_duration_s','value'),
           State('deterministic_opts','value'),
           prevent_initial_call=True)
-def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, setd, info_upd_interval, sigplot_color, n_steps_notrain,
+def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, setd, info_upd_interval, sigplot_color, n_steps_notrain,
                      model_name, train_logged_orig, train_logged_new, 
                      timer_interval_mins,
                      timer_signal_duration_s,
                      deterministic_opts):
     global env
     global trainer
-    timer_interval_s=timer_interval_mins*60
+    timer_interval_ms=timer_interval_mins*60*1000
+
+
     trigger = ctx.triggered[0]
     trigger_id = trigger['prop_id'].split('.')[0]
     trigger_value = trigger['value']
@@ -721,17 +725,17 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
           training_thread = threading.Thread(target=start_training, args=(training_args,))
           training_thread.daemon = True
           training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train', b_invis, b_invis, b_invis, b_invis, True, timer_interval_s
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train', b_invis, b_invis, b_invis, b_invis, True, timer_interval_ms
     if trigger_id=="start_session_static":
           training_thread = threading.Thread(target=start_session_static)
           training_thread.daemon = True
           training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'static', b_invis, b_invis, b_invis, b_invis, True, timer_interval_s
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'static', b_invis, b_invis, b_invis, b_invis, True, timer_interval_ms
     if trigger_id=="start_session_notrain":
           training_thread = threading.Thread(target=start_session_notrain, args=({'n_steps_notrain':n_steps_notrain},))
           training_thread.daemon = True
           training_thread.start()
-          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'notrain', b_invis, b_invis, b_invis, b_invis, True, timer_interval_s
+          return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'notrain', b_invis, b_invis, b_invis, b_invis, True, timer_interval_ms
     if trigger_id=="additional_session":
         #we collect training arguments in case they changed and run the same trainer
         #we do not initialize either new environment or new trainer
@@ -746,7 +750,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         training_thread = threading.Thread(target=start_training, args=(training_args,))
         training_thread.daemon = True
         training_thread.start()
-        return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train', b_invis, b_invis, b_invis, b_invis, True, timer_interval_s
+        return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train', b_invis, b_invis, b_invis, b_invis, True, timer_interval_ms
 
     if trigger_id=="run_trained":
         tkns=model_name.split('/')
@@ -809,7 +813,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
             training_thread = threading.Thread(target=start_session_trained_model, args=({'n_steps_notrain':n_steps_notrain},))
             training_thread.daemon = True
             training_thread.start()
-            return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'log', b_invis, b_invis, b_invis, b_invis, True, timer_interval_s
+            return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'log', b_invis, b_invis, b_invis, b_invis, True, timer_interval_ms
         else:
             trainer.set_model_environment() #if we want to train, we need to connect the model to the environment
             training_args={
@@ -824,7 +828,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
             training_thread.daemon = True
             training_thread.start()
 
-            return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train', b_invis, b_invis, b_invis, b_invis, True, timer_interval_s
+            return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'train', b_invis, b_invis, b_invis, b_invis, True, timer_interval_ms
     
     if trigger_id=="stop_session_train":
         try:
@@ -835,13 +839,16 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                 env.close()
             except Exception as e:
                 print(f"On environment stop received: {e}")
-        return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop', b_vis, b_invis, b_vis, b_invis, True, timer_interval_s
+        return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop', b_vis, b_invis, b_vis, b_invis, True, timer_interval_ms
     
     if trigger_id=="run_timer":
-        return b_invis, b_invis, b_invis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop', b_invis, b_vis, b_invis, b_invis, False, timer_interval_s
+        print('Timer is started')
+        env.stop_audiovis_feedback()
+        return b_invis, b_invis, b_invis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop', b_invis, b_vis, b_invis, b_invis, False, timer_interval_ms
     if trigger_id=="stop_timer":
         env.close()
-        return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop', b_vis, b_invis, b_vis, b_invis, True, timer_interval_s
+        print('Timer is stopped')
+        return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop', b_vis, b_invis, b_vis, b_invis, True, timer_interval_ms
 
 
           
