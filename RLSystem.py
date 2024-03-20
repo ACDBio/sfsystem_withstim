@@ -94,6 +94,8 @@ class SFSystemCommunicator(gym.Env):
                  stim_length_on_reset=10,
                  use_abs_values_for_raw_data_in_reward=False,
                  only_pos_encoder_mode=True):
+        self.enc_is_clicked=0
+        self.enc_is_holded=0
         self.use_abs_values_for_raw_data_in_reward=use_abs_values_for_raw_data_in_reward
         self.only_pos_encoder_mode=only_pos_encoder_mode
         self.colors=colors
@@ -428,7 +430,13 @@ class SFSystemCommunicator(gym.Env):
         self.raw_data=[]
         for key, value in self.current_sample.items():
             if use_synth_data==False:
-                self.raw_data.append(value)
+                if key not in ['enc_is_clicked', "enc_is_holded"]:
+                    self.raw_data.append(value)
+                else:
+                    if key=='enc_is_clicked':
+                        self.enc_is_clicked=value[0]
+                    if key=='enc_is_holded':
+                        self.enc_is_holded=value[0]
             else:
                 self.raw_data.append(self.synth_data())
         self.raw_data=np.array(self.raw_data).transpose()
@@ -795,7 +803,7 @@ class stable_baselines_model_trainer():
                 new_actions[27] = action_modifier
             if ma=='Sound volume':
                 new_actions[37] = action_modifier
-
+        
         self.env.step(new_actions)
         return
 

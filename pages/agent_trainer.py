@@ -333,6 +333,8 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 'Session name: ',
                 dcc.Input(type='text', placeholder='Session name (old data, if present, will be overwritten)', value='default_session', id='session_name', size=30),]),
                 html.Br(),
+                dcc.Checklist(options=['Save actions on encoder hold'], value=[], id='save_actions_on_hold'),
+                html.Br(),
                 dbc.Button("Show session data", id="open_plot_panel", n_clicks=0),    
                 dbc.Offcanvas(children=[html.Br(),
                  dbc.Row(justify="start", id='message_row', children=[]),
@@ -403,6 +405,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Br(),
                 html.Button("Send to display", id="send_display_text", style=b_vis, n_clicks=0),
                 html.Button("Clear display (if anything present)", id="clear_display", style=b_vis, n_clicks=0),                 
+                dcc.Checklist(options=['Pause/restart signal on encoder click (for non-training modes)'], value=['Pause/restart signal on encoder hold (for non-training modes)'], id='pause_on_click'),
                 ],
                 style={"width": "50%"},) 
                   ])]      
@@ -733,6 +736,7 @@ def get_state_from_model_logfile(logfile=None):
           State('deterministic_opts','value'),
           State('reward_mapping_interval', 'value'),
           State('overlay_random', 'value'),
+          State('pause_on_click',   'value'),
 
           prevent_initial_call=True)
 def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, n_clicks_stop_direct_feedback,
@@ -742,10 +746,15 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                      timer_signal_duration_s,
                      deterministic_opts,
                      reward_mapping_interval,
-                     overlay_random):
+                     overlay_random,
+                     pause_on_click):
     global env
     global trainer
     timer_interval_ms=timer_interval_mins*60*1000
+    if len('pause_on_click')>0:
+        pause_on_click=True
+    else:
+        pause_on_click=False
 
 
     trigger = ctx.triggered[0]
@@ -831,7 +840,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
           training_thread.start()
           return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'static', b_invis, b_invis, b_invis, b_invis, True, timer_interval_ms
     if trigger_id=="start_session_notrain":
-          training_thread = threading.Thread(target=start_session_notrain, args=({'n_steps_notrain':n_steps_notrain},))
+          training_thread = threading.Thread(target=start_session_notrain, args=({'n_steps_notrain':n_steps_notrain,
+                                                                                  'pause_on_click':pause_on_click},))
           training_thread.daemon = True
           training_thread.start()
           return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'notrain', b_invis, b_invis, b_invis, b_invis, True, timer_interval_ms
@@ -843,7 +853,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                 'log_model':sd['log_model'],
                 'n_total_timesteps':sd['n_total_timesteps'],
                 'log_or_plot_every_n_timesteps':sd['log_or_plot_every_n_timesteps'],
-                'jnb':False
+                'jnb':False,
+                'pause_on_click':pause_on_click
                 
         }
         training_thread = threading.Thread(target=start_training, args=(training_args,))
@@ -909,7 +920,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                             n_steps_per_timestep=sd['n_steps_per_timestep'])
         trainer.load_model(f'session_lib/{session_name}/{model_name}')
         if len(train_logged_orig)==0 and len(train_logged_new)==0:
-            training_thread = threading.Thread(target=start_session_trained_model, args=({'n_steps_notrain':n_steps_notrain},))
+            training_thread = threading.Thread(target=start_session_trained_model, args=({'n_steps_notrain':n_steps_notrain,
+                                                                                          'pause_on_click':pause_on_click},))
             training_thread.daemon = True
             training_thread.start()
             return b_invis, b_invis, b_invis, b_vis, b_vis, False, info_upd_interval, b_invis, 'log', b_invis, b_invis, b_invis, b_invis, True, timer_interval_ms
@@ -920,7 +932,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                 'log_model':sd['log_model'],
                 'n_total_timesteps':sd['n_total_timesteps'],
                 'log_or_plot_every_n_timesteps':sd['log_or_plot_every_n_timesteps'],
-                'jnb':False
+                'jnb':False,
+                'pause_on_click':pause_on_click
                 
             }
             training_thread = threading.Thread(target=start_training, args=(training_args,))
@@ -965,6 +978,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
             'overlay_random':overlay_random,
             'reward_mapping_min':int(reward_mapping_interval.split('-')[0]),
             'reward_mapping_max':int(reward_mapping_interval.split('-')[1]),
+            'pause_on_click':pause_on_click
         }
 
         training_thread = threading.Thread(target=start_session_direct_feedback, args=(training_args,))
@@ -992,10 +1006,20 @@ def start_session_direct_feedback(arg):
     reward_mapping_max=arg['reward_mapping_max']
     overlay_random=arg['overlay_random']
     mapped_outputs=arg['mapped_outputs']
+    pause_on_click=arg['pause_on_click']
+    env_paused=False
     while nsteps_notrain>0:
         try:
-            trainer.direct_feedback_run(reward_mapping_min, reward_mapping_max, overlay_random, mapped_outputs, min_space_value=-1, max_space_value=1)
-            nsteps_notrain-=1
+            if env_paused==False:
+                trainer.direct_feedback_run(reward_mapping_min, reward_mapping_max, overlay_random, mapped_outputs, min_space_value=-1, max_space_value=1)
+                nsteps_notrain-=1
+                if pause_on_click==True:
+                    if trainer.env.enc_is_clicked==1:
+                        env_paused=True
+            else:
+                trainer.env.sample_observations()
+                if trainer.env.enc_is_clicked==1:
+                    env_paused=False
         except Exception as e:
             n_steps_notrain=0
             print(f"Training thread terminated: {e}")
@@ -1011,13 +1035,24 @@ def start_session_trained_model(arg):
     global env
     global trainer
     nsteps_notrain=arg['n_steps_notrain']
+    pause_on_click=arg['pause_on_click']
+    env_paused=False
     while nsteps_notrain>0:
         n_notrain=nsteps_notrain
         try:
-            obs=trainer.env.reset()[0]
-            action, _states = trainer.model.predict(obs, deterministic=True)
-            obs, reward, done, info = trainer.env.step(action)
-            nsteps_notrain-=1
+            if env_paused==False:
+                obs=trainer.env.reset()[0]
+                action, _states = trainer.model.predict(obs, deterministic=True)
+                obs, reward, done, info = trainer.env.step(action)
+                nsteps_notrain-=1
+                if pause_on_click==True:
+                    if trainer.env.enc_is_clicked==1:
+                        env_paused=True
+            else:
+                trainer.env.sample_observations()
+                if trainer.env.enc_is_clicked==1:
+                    env_paused=False
+
         except Exception as e:
             n_steps_notrain=0
             print(f"Training thread terminated: {e}")
@@ -1054,10 +1089,25 @@ def start_session_notrain(arg):
     global env
     global trainer
     nsteps_notrain=arg['n_steps_notrain']
+    pause_on_click=arg['pause_on_click']
+    env_paused=False
     while nsteps_notrain>0:
         try:
-            trainer.dynamic_launch()
-            nsteps_notrain-=1
+            print(env_paused)
+            if env_paused==False:
+                trainer.dynamic_launch()
+                nsteps_notrain-=1
+                #print(trainer.env.current_sample)
+                #print(trainer.env.enc_is_clicked)
+                if pause_on_click==True:
+                    if trainer.env.enc_is_clicked==1:
+                        env_paused=True
+
+            else:
+                trainer.env.sample_observations()
+                if trainer.env.enc_is_clicked==1:
+                    env_paused=False
+
         except Exception as e:
             n_steps_notrain=0
             print(f"Training thread terminated: {e}")
