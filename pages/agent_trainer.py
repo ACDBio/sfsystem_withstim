@@ -570,7 +570,7 @@ def copy_file(source_file_path, destination_folder_path):
 def copy_session_logs_to_lib(n_clicks, sname):
     session_dir=f'./session_lib/{sname}'
     if os.path.isdir(session_dir):
-        os.rmtree(session_dir)
+        shutil.rmtree(session_dir)
     os.mkdir(session_dir)
     cfiles=os.listdir('./')
     for f in cfiles:
@@ -582,7 +582,7 @@ def copy_session_logs_to_lib(n_clicks, sname):
           Input("clear_session_lib", 'n_clicks'),
           prevent_initial_call=True)
 def clear_session_lib(n_clicks):
-    os.rmtree('./session_lib')
+    shutil.rmtree('./session_lib')
     os.mkdir('./session_dir')
     return os.listdir('./session_lib')
 
