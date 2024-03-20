@@ -792,8 +792,8 @@ void loop() {
 
       // reset the sample count
       sample_count = 0;
-      int enc_is_click = 0;
-      int enc_is_holded =  0;
+      enc_is_click = 0;
+      enc_is_holded =  0;
     }
   }
 }
