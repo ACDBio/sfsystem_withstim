@@ -231,7 +231,7 @@ uint8_t led_brightness = 100; //The brightness is a value between 0 (min brightn
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 //Encoder setup
-Encoder enc(ENC_CLK, ENC_DT);
+Encoder enc(ENC_CLK, ENC_DT, ENC_SW);
 //Encoder enc(ENC_CLK, ENC_DT, ENC_SW, TYPE1);
 
 
@@ -645,6 +645,8 @@ int sample_count = 0; // variable to keep track of the number of samples taken
 int enc_val_n = 0;
 //int enc_val_diff = 0;
 int enc_cum_val_whilenodtransfer=0;
+int enc_is_click = 0;
+int enc_is_holded =  0;
 void loop() {
   enc.tick();
   //Serial.println(444);
@@ -657,6 +659,9 @@ void loop() {
     if (enc.isLeft()) enc_val_n--;     
     if (enc.isLeftH()) enc_val_n -= 5;
   }
+  if (enc.isClick()) enc_is_click = 1;
+  if (enc.isHolded()) enc_is_holded = 1;
+  
   enc_cum_val_whilenodtransfer+=enc_val_n;
   enc_val_n = 0;
 
@@ -672,6 +677,9 @@ void loop() {
       if (enc.isLeft()) enc_val_n--;     
       if (enc.isLeftH()) enc_val_n -= 5;
     }
+
+    if (enc.isClick()) enc_is_click = 1;
+    if (enc.isHolded()) enc_is_holded = 1;
     // Serial.println(111);
     //Serial.println(enc_val_n);
     // Serial.println(222);
@@ -774,12 +782,18 @@ void loop() {
           jsonMessage += ",";
         }
       }
+      jsonMessage += "],\"enc_is_clicked\":[";
+      jsonMessage += enc_is_click;
+      jsonMessage += "],\"enc_is_holded\":[";
+      jsonMessage += enc_is_holded;
       jsonMessage += "]}";
       // send data to client
       webSocket.sendTXT(clientID, jsonMessage);
 
       // reset the sample count
       sample_count = 0;
+      int enc_is_click = 0;
+      int enc_is_holded =  0;
     }
   }
 }
