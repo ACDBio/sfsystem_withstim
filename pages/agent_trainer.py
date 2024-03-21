@@ -311,7 +311,14 @@ layout=html.Div(
             html.Br(),
             'Additional options for running the trained model: ',
             dcc.Checklist(options=['Train the logged model with the original settings'], value=[], id='train_logged_orig'),
-             dcc.Checklist(options=['Train the logged model with the new settings'], value=[], id='train_logged_new'), ])])
+            dcc.Checklist(options=['Train the logged model with the new settings'], value=[], id='train_logged_new'),
+            html.Br(),
+            'Action log location to launch: ',
+            dcc.Input(type='text', placeholder='session name/model name/action_no.log', value='default_session/action_0.log', id='action_log_name', size=30),
+            html.Br(),
+            html.Button("Trigger logged action", id="run_action", style=b_vis, n_clicks=0),            
+               ]),
+             ])
 ]),
 dbc.Col(children=[dcc.Markdown("### Session Data"),
                  html.Div(id='plot_style_container', children=[
@@ -722,7 +729,7 @@ def get_state_from_model_logfile(logfile=None):
           Input("run_direct_feedback","n_clicks"),
           Input("stop_timer","n_clicks"),
           Input("stop_direct_feedback","n_clicks"),
-          
+          Input("run_action","n_clicks"),
 
 
 
@@ -740,9 +747,10 @@ def get_state_from_model_logfile(logfile=None):
           State('overlay_random', 'value'),
           State('pause_on_click',   'value'),
           State('log_actions_on_hold', 'value'),
+          State('action_log_name','value'),
 
           prevent_initial_call=True)
-def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, n_clicks_stop_direct_feedback,
+def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, n_clicks_stop_direct_feedback, n_clicks_run_action,
                      setd, info_upd_interval, sigplot_color, n_steps_notrain,
                      model_name, train_logged_orig, train_logged_new, 
                      timer_interval_mins,
@@ -751,7 +759,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                      reward_mapping_interval,
                      overlay_random,
                      pause_on_click,
-                     log_actions_on_hold):
+                     log_actions_on_hold,
+                     action_log_name):
     global env
     global trainer
     timer_interval_ms=timer_interval_mins*60*1000
@@ -777,7 +786,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         sigplot_colors=[sigplot_color for i in range(sd['n_input_channels'])]
 
 
-    if trigger_id in ['start_session_train', "start_session_static", "start_session_notrain", "run_timer", "run_direct_feedback"]:
+    if trigger_id in ['start_session_train', "start_session_static", "start_session_notrain", "run_timer", "run_direct_feedback", "run_action"]:
         if trigger_id=="run_timer":
             sd['step_stim_length_millis']=timer_signal_duration_s*1000
         env = SFSystemCommunicator(out_dict=out_dict,
@@ -834,7 +843,10 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                     'jnb':False
                     
                 }
-    
+    if trigger_id=="run_action":
+        action_log_fn='session_lib/'+action_log_name
+        env.read_and_launch_logged_actions(actionlogfn=action_log_fn)
+        raise PreventUpdate
     if trigger_id =='start_session_train':
           #print(sd)
           #print(out_dict)

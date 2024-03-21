@@ -535,9 +535,9 @@ class SFSystemCommunicator(gym.Env):
                 self.render()
             #print('step_done')
             if self.log_actions_on_hold==True:
-                print('Here')
-                print(self.enc_is_holded)
-                print(self.current_sample)
+                
+                #print(self.enc_is_holded)
+                #print(self.current_sample)
                 if self.enc_is_holded:
                     self.log_actions()
             return new_observations, reward, self.done, {} #False
