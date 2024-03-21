@@ -38,10 +38,19 @@ offcanvas_session_lib = html.Div(
     ]
 )
 
+def get_dir_tree(dirloc):
+    results=[]
+    for dirpath, dirnames, filenames in os.walk(dirloc):
+        results.append(f"{dirpath.split('/')[-1]}:")
+        results.append(html.Hr())
+        for filename in filenames:
+            results.append('  '+filename)
+        results.append(html.Br())
+    return results[2:]
 
 layout=html.Div(
     [dcc.Store(id='run_type', data=None),
-     dcc.Store(id='session_library', data=os.listdir('./session_lib')),
+     dcc.Store(id='session_library', data=get_dir_tree('./session_lib')),
      #dbc.Row(justify="start", id='message_row', children=[]),
                  dbc.Row(justify="start", children=[dbc.Col(width=4, children=[
     dcc.Store(id='settings_dictionary',data=None),
@@ -612,7 +621,7 @@ def copy_session_logs_to_lib(n_clicks, sname):
             copy_file(f'./{f}', session_dir)
         if 'act' in f:  #copy actions
             copy_file(f'./{f}', session_dir)
-    return os.listdir('./session_lib')
+    return get_dir_tree('./session_lib')
 
 @callback(Output('session_library', 'data', allow_duplicate=True),
           Input("clear_session_lib", 'n_clicks'),
@@ -620,7 +629,7 @@ def copy_session_logs_to_lib(n_clicks, sname):
 def clear_session_lib(n_clicks):
     shutil.rmtree('./session_lib')
     os.mkdir('./session_dir')
-    return os.listdir('./session_lib')
+    return get_dir_tree('./session_lib')
 
 
 @callback(Output('clear_logfiles', 'children'),
