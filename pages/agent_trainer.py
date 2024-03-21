@@ -333,7 +333,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 'Session name: ',
                 dcc.Input(type='text', placeholder='Session name (old data, if present, will be overwritten)', value='default_session', id='session_name', size=30),]),
                 html.Br(),
-                dcc.Checklist(options=['Save actions on encoder hold'], value=[], id='log_actions_on_hold'),
+                dcc.Checklist(options=['Save actions on encoder hold'], value=['Save actions on encoder hold'], id='log_actions_on_hold'),
                 html.Br(),
                 dbc.Button("Show session data", id="open_plot_panel", n_clicks=0),    
                 dbc.Offcanvas(children=[html.Br(),
@@ -762,7 +762,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         log_actions_on_hold=True
     else:
         log_actions_on_hold=False
-        
+
     trigger = ctx.triggered[0]
     trigger_id = trigger['prop_id'].split('.')[0]
     trigger_value = trigger['value']
