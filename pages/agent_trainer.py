@@ -10,6 +10,7 @@ import os
 import json
 from dash.exceptions import PreventUpdate
 import shutil
+from datetime import datetime
 
 
 dash.register_page(__name__,'/')
@@ -339,6 +340,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Br(),
                 'Session name: ',
                 dcc.Input(type='text', placeholder='Session name (old data, if present, will be overwritten)', value='default_session', id='session_name', size=30),]),
+                html.Button("Set session name to current timestamp", id="set_session_name_to_timestamp", style=b_vis, n_clicks=0),
                 html.Br(),
                 dcc.Checklist(options=['Save actions on encoder hold'], value=['Save actions on encoder hold'], id='log_actions_on_hold'),
                 html.Br(),
@@ -458,9 +460,19 @@ def toggle_offcanvas_scrollable(n_clicks_st, n_clicks_cd, text, text_size):
             env.ws.send("turn_off_display")
         
 
-
+@callback(
+    Output('session_name', "value"),
+    Input("set_session_name_to_timestamp", "n_clicks"),
+    prevent_initial_call=True
+)
+def set_session_name_to_ts(n1):
     
+    # Get the current date
+    current_date = datetime.now()
 
+    # Format the date as 'd.month.,year'
+    formatted_date = current_date.strftime("%d.%m.%Y_%H:%M")
+    return formatted_date
 
 
 
@@ -685,6 +697,7 @@ def collect_settings(n_intervals, runtype):
                 html.Br(),
                 f'Best action overall: {trainer.env.best_action_overall} (reward {trainer.env.overall_max_reward})',
                 html.Br(),
+                f'Current action: {trainer.env.current_actions}',
                 f'Training completion: {trainer.training_completed}']            
     return training_fig, signal_fig, messages
 
