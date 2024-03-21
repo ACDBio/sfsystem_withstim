@@ -94,7 +94,7 @@ class SFSystemCommunicator(gym.Env):
                  stim_length_on_reset=10,
                  use_abs_values_for_raw_data_in_reward=False,
                  only_pos_encoder_mode=True,
-                 log_actions_on_hold=False):
+                 log_actions_on_hold=True):
         self.enc_is_clicked=0
         self.enc_is_holded=0
         self.log_actions_on_hold=log_actions_on_hold
@@ -215,13 +215,22 @@ class SFSystemCommunicator(gym.Env):
             open(self.logfn, 'a').close()
     
     def log_actions(self):
-        actionstring=self.get_json_string_from_ordered_dict(self.current_action)
+        actionstring=self.get_json_string_from_ordered_dict(self.current_actions)
         actname=f'action_{self.cur_action_log_no}.log'
         with open(actname, 'w') as f:
-            json.dumps(actionstring)
+            actstring=json.dumps(actionstring)
+            f.write(actstring)
         self.cur_action_log_no+=1
         return
-    
+    def read_and_launch_logged_actions(self, actionlogfn):
+        with open(actionlogfn)  as f:
+            lines=f.read()
+        linesd=json.loads(json.loads(lines))
+        act=OrderedDict(linesd)
+        for key, value in act.items():
+            act[key]=np.array(value)
+        self.step(act)
+
     def write_tolog(self, string):
         with open(self.logfn, 'a') as log_file:
             log_file.write(string + '\n')
@@ -525,7 +534,10 @@ class SFSystemCommunicator(gym.Env):
             if self.render_each_step==True:
                 self.render()
             #print('step_done')
-            if self.self.log_actions_on_hold==True:
+            if self.log_actions_on_hold==True:
+                print('Here')
+                print(self.enc_is_holded)
+                print(self.current_sample)
                 if self.enc_is_holded:
                     self.log_actions()
             return new_observations, reward, self.done, {} #False

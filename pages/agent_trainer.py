@@ -579,6 +579,8 @@ def copy_session_logs_to_lib(n_clicks, sname):
     for f in cfiles:
         if f in ['current_training.log', 'model_stats.log','best_total_episode_reward_model.zip','best_overall_reward_model.zip']:
             copy_file(f'./{f}', session_dir)
+        if 'act' in f:  #copy actions
+            copy_file(f'./{f}', session_dir)
     return os.listdir('./session_lib')
 
 @callback(Output('session_library', 'data', allow_duplicate=True),
