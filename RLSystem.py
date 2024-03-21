@@ -225,7 +225,21 @@ class SFSystemCommunicator(gym.Env):
     def read_and_launch_logged_actions(self, actionlogfn):
         with open(actionlogfn)  as f:
             lines=f.read()
-        linesd=json.loads(json.loads(lines))
+        try:
+            linesd=json.loads(lines)
+            print(linesd.keys()) 
+        except:
+            linesd=json.loads(json.loads(lines))
+        act=OrderedDict(linesd)
+        for key, value in act.items():
+            act[key]=np.array(value)
+        self.step(act)
+    def launch_action_from_json_string(self, actionstring):
+        try:
+            linesd=json.loads(actionstring)
+            print(linesd.keys()) 
+        except:
+            linesd=json.loads(actionstring)
         act=OrderedDict(linesd)
         for key, value in act.items():
             act[key]=np.array(value)

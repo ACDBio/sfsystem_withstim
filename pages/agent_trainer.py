@@ -413,6 +413,18 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Button("Send to display", id="send_display_text", style=b_vis, n_clicks=0),
                 html.Button("Clear display (if anything present)", id="clear_display", style=b_vis, n_clicks=0),                 
                 dcc.Checklist(options=['Pause or restart signal on encoder click'], value=['Pause or restart signal on encoder click'], id='pause_on_click'),
+                dcc.Markdown("##### Launch action from json string"),
+                html.Hr(),
+                dcc.Textarea(
+                    id='action_text',
+                    value='{"leddelay": [100.0], "lv1r": [190.03234773874283], "lv1g": [168.18682730197906], "lv1b": [255.0], "lv2r": [196.86115473508835], "lv2g": [159.4429063796997], "lv2b": [185.24352610111237], "lv3r": [149.18937146663666], "lv3g": [151.4224249124527], "lv3b": [10.0], "lv4r": [77.70063683390617], "lv4g": [255.0], "lv4b": [255.0], "lv5r": [66.86547353863716], "lv5g": [255.0], "lv5b": [17.525383979082108], "lv6r": [10.0], "lv6g": [237.40646064281464], "lv6b": [110.9641245007515], "lv7r": [213.2022413611412], "lv7g": [255.0], "lv7b": [145.3699791431427], "lv8r": [10.0], "lv8g": [255.0], "lv8b": [182.14710593223572], "wave_1_freq": [14318.983242064714], "wave_2_freq": [6777.882110029459], "panner_freq": [32.50046396255493], "phasor_1_freq": [8.703051596879959], "phasor_2_freq": [9.96783521771431], "phasor_1_min": [1.0], "phasor_2_min": [1.0], "phasor_1_dif": [5.6508409678936005], "phasor_2_dif": [27.42316609621048], "panner_div": [3.862565517425537], "wave_1_type": [3.0], "wave_2_type": [0.5501725673675537], "maxivolume": [9.150283694267273]}',
+                    style={'width': '100%', 'height': 150, 'font-size': '14px', 'line-height': '1'},
+                    maxLength=1024, # Adjust the maxLength as needed
+                    rows=32, # Adjust the number of rows as needed
+                    cols=128, # Adjust the number of columns as needed
+                ),
+                html.Br(),
+                html.Button("Launch action", id="action_from_string", style=b_vis, n_clicks=0),
                 ],
                 style={"width": "50%"},) 
                   ])]      
@@ -730,6 +742,7 @@ def get_state_from_model_logfile(logfile=None):
           Input("stop_timer","n_clicks"),
           Input("stop_direct_feedback","n_clicks"),
           Input("run_action","n_clicks"),
+          Input("action_from_string","n_clicks"),
 
 
 
@@ -748,9 +761,11 @@ def get_state_from_model_logfile(logfile=None):
           State('pause_on_click',   'value'),
           State('log_actions_on_hold', 'value'),
           State('action_log_name','value'),
+          State('action_text', 'value'),
 
           prevent_initial_call=True)
-def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, n_clicks_stop_direct_feedback, n_clicks_run_action,
+def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, n_clicks_stop_direct_feedback, 
+                     n_clicks_run_action,  n_clicks_action_from_string,
                      setd, info_upd_interval, sigplot_color, n_steps_notrain,
                      model_name, train_logged_orig, train_logged_new, 
                      timer_interval_mins,
@@ -760,7 +775,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                      overlay_random,
                      pause_on_click,
                      log_actions_on_hold,
-                     action_log_name):
+                     action_log_name,
+                    action_text):
     global env
     global trainer
     timer_interval_ms=timer_interval_mins*60*1000
@@ -843,6 +859,9 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                     'jnb':False
                     
                 }
+    if  trigger_id=="action_from_string":
+        env.launch_action_from_json_string(action_text)
+        raise PreventUpdate
     if trigger_id=="run_action":
         action_log_fn='session_lib/'+action_log_name
         env.read_and_launch_logged_actions(actionlogfn=action_log_fn)
