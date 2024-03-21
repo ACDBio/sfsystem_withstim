@@ -406,7 +406,10 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 dcc.Checklist(options=['Overlay random signal'], value=[], id='overlay_random'),               
                 html.Br(),   
                 html.Button("Run direct feedback", id="run_direct_feedback", style=b_vis, n_clicks=0),
-                html.Button("Stop direct feedback", id="stop_direct_feedback", style=b_invis, n_clicks=0), 
+                html.Button("Stop direct feedback", id="stop_direct_feedback", style=b_invis, n_clicks=0), ],  style={"width": "50%"},),
+
+
+                html.Div(children=[
                 dcc.Markdown("#### OLED suggestion setup"),
                 html.Hr(),
                 dcc.Textarea(
@@ -440,7 +443,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Br(),
                 html.Button("Stop audio-visual output", id="stop_audiovis", style=b_vis, n_clicks=0),
                 ],
-                style={"width": "50%"},) 
+                style={"width": "70%"},) 
                   ])]      
           
 )
