@@ -437,6 +437,8 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Br(),
                 html.Button("Get current action", id="get_current_action", style=b_vis, n_clicks=0),
                 html.Button("Launch action", id="action_from_string", style=b_vis, n_clicks=0),
+                html.Br(),
+                html.Button("Stop audio-visual output", id="stop_audiovis", style=b_vis, n_clicks=0),
                 ],
                 style={"width": "50%"},) 
                   ])]      
@@ -453,7 +455,15 @@ def toggle_offcanvas_scrollable(n1):
     act=env.get_json_string_from_ordered_dict(env.current_actions)
     return act
     
-
+@callback(
+    Output("stop_audiovis", "n_clicks"),
+    Input("stop_audiovis", "n_clicks"),
+    prevent_initial_call=True
+)
+def stop_audiovis_fb(n1):
+    global  env
+    env.stop_audiovis_feedback()
+    return n1
 
 @callback(
     Output("send_display_text", "n_clicks"),
