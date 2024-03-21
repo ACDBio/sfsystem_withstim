@@ -93,9 +93,12 @@ class SFSystemCommunicator(gym.Env):
                  colors=color_names, 
                  stim_length_on_reset=10,
                  use_abs_values_for_raw_data_in_reward=False,
-                 only_pos_encoder_mode=True):
+                 only_pos_encoder_mode=True,
+                 log_actions_on_hold=False):
         self.enc_is_clicked=0
         self.enc_is_holded=0
+        self.log_actions_on_hold=log_actions_on_hold
+
         self.use_abs_values_for_raw_data_in_reward=use_abs_values_for_raw_data_in_reward
         self.only_pos_encoder_mode=only_pos_encoder_mode
         self.colors=colors
@@ -206,14 +209,19 @@ class SFSystemCommunicator(gym.Env):
         self.training_completed=False
         self.figures={'signal_fig':[],'training_fig':[]}
         self.colornames=color_names
+        self.cur_action_log_no=0
     def create_log(self):
         if not os.path.isfile(self.logfn):
             open(self.logfn, 'a').close()
     
-
-
-
-
+    def log_actions(self):
+        actionstring=self.get_json_string_from_ordered_dict(self.current_action)
+        actname=f'action_{self.cur_action_log_no}.log'
+        with open(actname, 'w') as f:
+            json.dumps(actionstring)
+        self.cur_action_log_no+=1
+        return
+    
     def write_tolog(self, string):
         with open(self.logfn, 'a') as log_file:
             log_file.write(string + '\n')
@@ -517,6 +525,9 @@ class SFSystemCommunicator(gym.Env):
             if self.render_each_step==True:
                 self.render()
             #print('step_done')
+            if self.self.log_actions_on_hold==True:
+                if self.enc_is_holded:
+                    self.log_actions()
             return new_observations, reward, self.done, {} #False
         else:
             print('No connection')

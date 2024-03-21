@@ -303,7 +303,7 @@ layout=html.Div(
             ' ',
             html.Button("Run static session", id="start_session_static", style=b_vis, n_clicks=0),
             ' ',
-            html.Button("Stop training", id="stop_session_train", style=b_invis, n_clicks=0),
+            html.Button("Stop session", id="stop_session_train", style=b_invis, n_clicks=0),
             ' ',
             html.Button("Run additional episodes", id="additional_session", style=b_invis, n_clicks=0),
             ' ',
@@ -405,7 +405,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Br(),
                 html.Button("Send to display", id="send_display_text", style=b_vis, n_clicks=0),
                 html.Button("Clear display (if anything present)", id="clear_display", style=b_vis, n_clicks=0),                 
-                dcc.Checklist(options=['Pause/restart signal on encoder click (for non-training modes)'], value=['Pause/restart signal on encoder hold (for non-training modes)'], id='pause_on_click'),
+                dcc.Checklist(options=['Pause or restart signal on encoder click'], value=['Pause or restart signal on encoder click'], id='pause_on_click'),
                 ],
                 style={"width": "50%"},) 
                   ])]      
@@ -933,7 +933,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                 'n_total_timesteps':sd['n_total_timesteps'],
                 'log_or_plot_every_n_timesteps':sd['log_or_plot_every_n_timesteps'],
                 'jnb':False,
-                'pause_on_click':pause_on_click
+                'pause_on_click':pause_on_clickd
                 
             }
             training_thread = threading.Thread(target=start_training, args=(training_args,))
