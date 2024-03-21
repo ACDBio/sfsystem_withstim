@@ -333,7 +333,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 'Session name: ',
                 dcc.Input(type='text', placeholder='Session name (old data, if present, will be overwritten)', value='default_session', id='session_name', size=30),]),
                 html.Br(),
-                dcc.Checklist(options=['Save actions on encoder hold'], value=[], id='save_actions_on_hold'),
+                dcc.Checklist(options=['Save actions on encoder hold'], value=[], id='log_actions_on_hold'),
                 html.Br(),
                 dbc.Button("Show session data", id="open_plot_panel", n_clicks=0),    
                 dbc.Offcanvas(children=[html.Br(),
@@ -737,6 +737,7 @@ def get_state_from_model_logfile(logfile=None):
           State('reward_mapping_interval', 'value'),
           State('overlay_random', 'value'),
           State('pause_on_click',   'value'),
+          State('log_actions_on_hold', 'value'),
 
           prevent_initial_call=True)
 def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, n_clicks_stop_direct_feedback,
@@ -747,7 +748,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                      deterministic_opts,
                      reward_mapping_interval,
                      overlay_random,
-                     pause_on_click):
+                     pause_on_click,
+                     log_actions_on_hold):
     global env
     global trainer
     timer_interval_ms=timer_interval_mins*60*1000
@@ -756,12 +758,17 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
     else:
         pause_on_click=False
 
-
+    if len('log_actions_on_hold')>0:
+        log_actions_on_hold=True
+    else:
+        log_actions_on_hold=False
+        
     trigger = ctx.triggered[0]
     trigger_id = trigger['prop_id'].split('.')[0]
     trigger_value = trigger['value']
     out_dict=setd['out_dict']
     sd=setd['session_settings']
+
     if sigplot_color.split(',')[0]=='random':
         sigplot_colors=get_random_css_color_names(sd['n_input_channels'], seed=int(sigplot_color.split(',')[1]))
     else:
@@ -803,7 +810,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 stim_length_on_reset=sd['stim_length_on_reset'],
                                                 only_pos_encoder_mode=sd['only_pos_encoder_mode'],
                                                 use_abs_values_for_raw_data_in_reward=sd['use_abs_values_for_raw_data_in_reward'],
-                                                colors=sigplot_colors)
+                                                colors=sigplot_colors,
+                                                log_actions_on_hold=log_actions_on_hold)
 
                 #print(sd)
             #print(out_dict)
@@ -912,7 +920,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                               stim_length_on_reset=sd['stim_length_on_reset'],
                                               only_pos_encoder_mode=sd['only_pos_encoder_mode'],
                                               use_abs_values_for_raw_data_in_reward=sd['use_abs_values_for_raw_data_in_reward'],
-                                              colors=sigplot_colors)    
+                                              colors=sigplot_colors,
+                                              log_actions_on_hold=log_actions_on_hold)    
         trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                             algorithm=sd['algorithm'],
                                                             policy='MlpPolicy',
@@ -933,7 +942,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                 'n_total_timesteps':sd['n_total_timesteps'],
                 'log_or_plot_every_n_timesteps':sd['log_or_plot_every_n_timesteps'],
                 'jnb':False,
-                'pause_on_click':pause_on_clickd
+                'pause_on_click':pause_on_click
                 
             }
             training_thread = threading.Thread(target=start_training, args=(training_args,))
