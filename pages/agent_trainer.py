@@ -435,6 +435,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                     cols=128, # Adjust the number of columns as needed
                 ),
                 html.Br(),
+                html.Button("Get current action", id="get_current_action", style=b_vis, n_clicks=0),
                 html.Button("Launch action", id="action_from_string", style=b_vis, n_clicks=0),
                 ],
                 style={"width": "50%"},) 
@@ -442,6 +443,17 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
           
 )
           ])                                        
+@callback(
+    Output('action_text', "value"),
+    Input("get_current_action", "n_clicks"),
+    prevent_initial_call=True
+)
+def toggle_offcanvas_scrollable(n1):
+    global  env
+    act=env.get_json_string_from_ordered_dict(env.current_actions)
+    return act
+    
+
 
 @callback(
     Output("send_display_text", "n_clicks"),
@@ -824,7 +836,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         sigplot_colors=[sigplot_color for i in range(sd['n_input_channels'])]
 
 
-    if trigger_id in ['start_session_train', "start_session_static", "start_session_notrain", "run_timer", "run_direct_feedback", "run_action"]:
+    if trigger_id in ['start_session_train', "start_session_static", "start_session_notrain", "run_timer", "run_direct_feedback", "run_action", "action_from_string"]:
         if trigger_id=="run_timer":
             sd['step_stim_length_millis']=timer_signal_duration_s*1000
         env = SFSystemCommunicator(out_dict=out_dict,

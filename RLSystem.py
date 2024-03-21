@@ -507,8 +507,9 @@ class SFSystemCommunicator(gym.Env):
 
 
             self.update_audiovis_feedback(update_dict=action)
-            time.sleep(self.step_stim_length)
             self.current_actions=action
+            time.sleep(self.step_stim_length)
+            
             new_observations=self.sample_and_process_observations_from_device()
             self.cur_observations=new_observations
             reward=self.get_reward(observations=new_observations, toreturn=True)
