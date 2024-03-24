@@ -685,6 +685,10 @@ void loop() {
     // Serial.println(222);
     // Serial.println(enc_val_prev);
     //enc_val_diff=enc_val_n-enc_val_prev;
+    ads.readInputToAdcValuesArray();
+    // Serial.println(ads.adcValues[ 0 ]);
+    // Serial.print( "      " );
+    // Serial.println();
     int ch1_val=ads.adcValues[ 0 ];
     int ch2_val=ads.adcValues[ 1 ];
     int ch3_val=ads.adcValues[ 2 ];

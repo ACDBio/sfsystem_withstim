@@ -14,8 +14,20 @@ import json
 import os
 import webcolors
 import random
+import threading
 plotly.io.json.config.default_engine = 'orjson'
+use_neuroplay=True
 websocket.enableTrace(False)
+
+if use_neuroplay:
+    neuroplay_loc='/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
+    def run_neuroplay():
+        neuroplay_loc = '/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
+        os.system(f'bash {neuroplay_loc}')
+    neuroplay_thread = threading.Thread(target=run_neuroplay)
+    neuroplay_thread.daemon = True
+    neuroplay_thread.start()
+
 def get_random_css_color_names(n, seed=333):
     """
     Returns a list of n different CSS color names.
@@ -78,8 +90,13 @@ out_order=['lv1r','lv1g','lv1b','lv2r','lv2g','lv2b','lv3r','lv3g','lv3b','lv4r'
           'phasor_1_min','phasor_1_dif','phasor_2_freq','phasor_2_min','phasor_2_dif','maxivolume','wave_1_type','wave_2_type']
 
 
+channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',6:'np_C4',7:'np_P4',8:'np_O2',
+              9:'sf_ch1',10:'sf_ch2',11:'sf_ch3',12:'sf_ch4',13:'sf_ch5',14:'sf_ch6',15:'sf_ch7',16:'sf_ch8',17:'sf_enc'}
+
+
+
 class SFSystemCommunicator(gym.Env):
-    def __init__(self, out_dict=out_dict, out_order=out_order,n_input_channels=8, channels_of_interest_inds=list(range(8)), n_timepoints_per_sample=100, max_sfsystem_output=1023,reward_formula_string='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', 
+    def __init__(self, out_dict=out_dict, out_order=out_order,input_channels=['np_O1','np_P3','np_C3','np_F3','np_F4','np_C4','np_P4','np_O2','sf_enc'], n_timepoints_per_sample=100, max_sfsystem_output=1023,reward_formula_string='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', 
                  fbins=[(0,1), (1,4), (4,8), (8,12), (12,30)], delay=10,
                  use_raw_in_os_def=False, use_freq_in_os_def=False, use_fbins_in_os_def=False, device_address="ws://10.42.0.231:80/",
                  step_stim_length_millis=10000, episode_time_seconds=60, render_data=True, return_plotly_figs=False,
@@ -94,7 +111,40 @@ class SFSystemCommunicator(gym.Env):
                  stim_length_on_reset=10,
                  use_abs_values_for_raw_data_in_reward=False,
                  only_pos_encoder_mode=True,
-                 log_actions_on_hold=True):
+                 log_actions_on_hold=True,
+                 channel_spec=channel_spec,
+                 use_unfiltered_np_data=True,
+                 write_edf_ann=False,
+                 edf_ann_fn='default_edf',
+                 edf_steps_annotation=True,
+                 edf_rf_annotation=True,
+                 edf_rf_annotation_threshold=1):
+        
+        self.channel_spec=channel_spec
+        self.sel_input_channels=input_channels
+        self.all_input_channels=list(self.channel_spec.values())
+        self.use_neuroplay=False
+        self.use_sf=False
+        for i in self.sel_input_channels:
+            if 'np' in i:
+                self.use_neuroplay=True
+            if 'sf' in i:
+                self.use_sf=True
+
+        self.use_unfiltered_np_data=use_unfiltered_np_data
+ 
+    
+
+
+        #edf writing
+        self.write_edf_ann=write_edf_ann
+        self.edf_ann_fn=edf_ann_fn
+        self.edfpath=f'{os.getcwd}/{edf_ann_fn}'
+        self.edf_steps_annotation=edf_steps_annotation
+        self.edf_rf_annotation=edf_rf_annotation
+        self.edf_rf_annotation_threshold=edf_rf_annotation_threshold
+
+
         self.enc_is_clicked=0
         self.enc_is_holded=0
         self.log_actions_on_hold=log_actions_on_hold
@@ -118,7 +168,7 @@ class SFSystemCommunicator(gym.Env):
         self.out_order=out_order
         self.max_sfsystem_output=max_sfsystem_output
         self.n_timepoints_per_sample=n_timepoints_per_sample
-        self.n_input_channels=n_input_channels
+        self.n_input_channels=len(self.sel_input_channels)
         self.reward_formula_string=reward_formula_string
         self.reward=None
 
@@ -140,7 +190,7 @@ class SFSystemCommunicator(gym.Env):
         self.fbins=fbins
         self.n_fbins=len(self.fbins)
 
-        self.channels_of_interest_inds=channels_of_interest_inds
+        self.channels_of_interest_inds=[self.all_input_channels.index(i) for i in self.sel_input_channels]
         self.channels_of_interest_inds.sort()
         self.n_channels_of_interest=len(self.channels_of_interest_inds)
 
@@ -163,7 +213,6 @@ class SFSystemCommunicator(gym.Env):
         self.init_observation_space()
         self.set_value_dict_for_reward_function()
         self.connect()
-        print(self.connection_status)
         self.set_delay_and_data_transfer_buffer_size()
         if self.only_pos_encoder_mode:
             self.set_pos_encoder_mode()
@@ -210,6 +259,8 @@ class SFSystemCommunicator(gym.Env):
         self.figures={'signal_fig':[],'training_fig':[]}
         self.colornames=color_names
         self.cur_action_log_no=0
+
+    
     def create_log(self):
         if not os.path.isfile(self.logfn):
             open(self.logfn, 'a').close()
@@ -358,16 +409,30 @@ class SFSystemCommunicator(gym.Env):
 
     def connect(self):
         websocket.enableTrace(False)
-        self.ws=websocket.WebSocket()
-        self.ws.connect(self.device_address)
-        self.connection_status=self.ws.recv()
+        self.ws_sf=websocket.WebSocket()
+        self.ws_sf.connect(self.device_address)
+        self.sf_connection_status=self.ws_sf.recv()
+        if self.sf_connection_status=='Connected':
+            print('SF system connected')
+        if self.use_neuroplay==True:
+            self.ws_np=websocket.WebSocket()
+            self.ws_np.connect("ws://localhost:1336/")
+            self.ws_connection_status=self.ws_np.connected
+            if self.ws_connection_status==True:
+                print('Neuroplay connected.')
+                self.ws_np.send('startDevice?id=0')
+                print(self.ws_np.recv())
+                #self.ws_np.send('EnableDataGrabMode')
+                #print(self.ws_np.recv())
+
+        
     def set_pos_encoder_mode(self):
-        self.ws.send('use_only_pos_enc_mode')
-        msg=self.ws.recv()
+        self.ws_sf.send('use_only_pos_enc_mode')
+        msg=self.ws_sf.recv()
         print(msg)
     def set_use_directional_enc_mode(self):
-        self.ws.send('use_directional_enc_mode')
-        msg=self.ws.recv()
+        self.ws_sf.send('use_directional_enc_mode')
+        msg=self.ws_sf.recv()
         print(msg)
     
     def get_fft_fromsignal(self, raw_singlech):
@@ -417,30 +482,30 @@ class SFSystemCommunicator(gym.Env):
         return fbins_data
 
     def set_delay_and_data_transfer_buffer_size(self):
-        self.ws.send("set_delay_and_data_transfer_buffer_size")
+        self.ws_sf.send("set_delay_and_data_transfer_buffer_size")
         time.sleep(self.timesleep_period)
         setup=False
         while setup==False:
             try:
-                device_msg=self.ws.recv()
+                device_msg=self.ws_sf.recv()
                 if device_msg == "Awaiting delay and data transfer buffer size in shape with space separator":
-                    self.ws.send(f'{self.delay},{self.n_timepoints_per_sample}')
+                    self.ws_sf.send(f'{self.delay},{self.n_timepoints_per_sample}')
                 time.sleep(self.timesleep_period)
-                device_msg=self.ws.recv()
+                device_msg=self.ws_sf.recv()
                 if device_msg == "Delay and data transfer buffer size set up":
                     setup = True 
                     break;
             except:
                 pass
     def start_data_transfer_from_device(self):
-        self.ws.send("start_data_transfer_from_ads")
+        self.ws_sf.send("start_data_transfer_from_ads")
     def stop_data_transfer_from_device(self):
-        self.ws.send("stop_data_transfer_from_ads")
+        self.ws_sf.send("stop_data_transfer_from_ads")
     def stop_audiovis_feedback(self):
-        self.ws.send("stop_led_cycle")
+        self.ws_sf.send("stop_led_cycle")
     
     def update_audiovis_feedback(self, update_dict=None, print_msg=True):
-        self.ws.send("receive_output_control_data")
+        self.ws_sf.send("receive_output_control_data")
         outmsg_vals=[]
         for controlnm in self.out_order:
             outmsg_vals.append(update_dict[controlnm][0])
@@ -450,29 +515,48 @@ class SFSystemCommunicator(gym.Env):
         self.current_control_msg=','.join(list(map(str,outmsg_vals)))
         if print_msg==True:
             print(self.current_control_msg)
-        self.ws.send(self.current_control_msg)
+        self.ws_sf.send(self.current_control_msg)
 
     def synth_data(self, signal_freq=30):
         y=1*np.sin(2*np.pi*signal_freq*self.timesteps)
         return y
     def sample_observations(self, use_synth_data=False): #True for testing of fft etc., False - for actual application
-        self.ws.send("start_data_transfer_from_ads")
-        self.current_sample=json.loads(self.ws.recv())
         self.raw_data=[]
-        for key, value in self.current_sample.items():
-            if use_synth_data==False:
-                if key not in ['enc_is_clicked', "enc_is_holded"]:
-                    self.raw_data.append(value)
-                else:
-                    if key=='enc_is_clicked':
-                        self.enc_is_clicked=value[0]
-                    if key=='enc_is_holded':
-                        self.enc_is_holded=value[0]
+        if self.use_neuroplay==True:
+            if self.use_unfiltered_np_data==True:
+                self.ws_np.send('RawData')
             else:
-                self.raw_data.append(self.synth_data())
-        self.raw_data=np.array(self.raw_data).transpose()
+                self.ws_np.send('FilteredData')
+            self.current_sample_np=np.array(json.loads(self.ws_np.recv())['data'])
+
+        else:
+            self.current_sample_np==np.zeros(shape=(8,1250))
+        for i in self.current_sample_np:
+                self.raw_data.append(i[-self.n_timepoints_per_sample:])   
+
+        if self.use_sf==True:
+            self.ws_sf.send("start_data_transfer_from_ads")
+            self.current_sample_sf=json.loads(self.ws_sf.recv())
+            self.ws_sf.send("stop_data_transfer_from_ads")
+            for key, value in self.current_sample_sf.items():
+                if use_synth_data==False:
+                    if key not in ['enc_is_clicked', "enc_is_holded"]:
+                        self.raw_data.append(np.array(value))
+                    else:
+                        if key=='enc_is_clicked':
+                            self.enc_is_clicked=value[0]
+                        if key=='enc_is_holded':
+                            self.enc_is_holded=value[0]
+                else:
+                    self.raw_data.append(self.synth_data())
+            #self.raw_data_sf=np.array(self.raw_data).transpose()
+        else:
+            self.current_sample_sf=np.zeros(shape=(8, self.n_timepoints_per_sample))
+            for i in self.current_sample_sf:
+                    self.raw_data.append(i)         
+        self.raw_data=np.array(self.raw_data, dtype=float).transpose()    
+        #elf.raw_data_all=self.raw_data
         self.raw_data=self.raw_data[:,self.channels_of_interest_inds]
-        self.ws.send("stop_data_transfer_from_ads")
     def sample_and_process_observations_from_device(self):
         new_observations=dict()
         self.sample_observations()
@@ -499,7 +583,7 @@ class SFSystemCommunicator(gym.Env):
                 self.write_tolog(json.dumps({'raw_data':self.cur_observations['raw_data'].tolist()}))
     def step(self, action):
         #print(action)
-        if self.ws.sock is not None:
+        if self.ws_sf.sock is not None:
             self.done=False
             self.best_overall_reward_now=False
             self.best_episode_reward_now=False
@@ -674,8 +758,8 @@ class SFSystemCommunicator(gym.Env):
         self.clear_reward_stats()
         if clear_log:
             self.clear_log()
-        if self.ws.sock is not None:
-            self.ws.close()
+        if self.ws_sf.sock is not None:
+            self.ws_sf.close()
         
                
 
@@ -685,7 +769,7 @@ class FlattenActionSpaceWrapper(gym.Wrapper):
         super().__init__(env)
         # Flatten the action space
         self.action_space = self._flatten_action_space(env.action_space, min_value, max_value)
-        # Store the normalization values
+        # Store the normalization valuesNo
         self.min_value = min_value
         self.max_value = max_value
 

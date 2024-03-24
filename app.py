@@ -1,10 +1,14 @@
 import dash
 import dash_bootstrap_components as dbc
 import plotly.io as pio
+import os
+import threading
 pio.templates.default = 'simple_white'
+
 
 app = dash.Dash(__name__, use_pages=True, external_stylesheets=[dbc.themes.FLATLY])
 server = app.server
+
 
 navbar = dbc.NavbarSimple(
     dbc.DropdownMenu(
@@ -26,6 +30,8 @@ app.layout = dbc.Container(
     [navbar, dash.page_container],
     fluid=True,
 )
+
+
 
 if __name__ == "__main__":
     app.run_server(debug=False)
