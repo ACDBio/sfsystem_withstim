@@ -18,16 +18,17 @@ import threading
 import shutil
 plotly.io.json.config.default_engine = 'orjson'
 websocket.enableTrace(False)
+#if smaple_obsevarions() stuck - restart the esp32 (not by button, but by getting usb oord in-out)
 
-use_neuroplay=True
-if use_neuroplay:
-    neuroplay_loc='/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
-    def run_neuroplay():
-        neuroplay_loc = '/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
-        os.system(f'bash {neuroplay_loc}')
-    neuroplay_thread = threading.Thread(target=run_neuroplay)
-    neuroplay_thread.daemon = True
-    neuroplay_thread.start()
+# use_neuroplay=True
+# if use_neuroplay:
+#     neuroplay_loc='/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
+#     def run_neuroplay():
+#         neuroplay_loc = '/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
+#         os.system(f'bash {neuroplay_loc}')
+#     neuroplay_thread = threading.Thread(target=run_neuroplay)
+#     neuroplay_thread.daemon = True
+#     neuroplay_thread.start()
 
 def get_random_css_color_names(n, seed=333):
     """
