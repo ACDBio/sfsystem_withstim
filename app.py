@@ -4,15 +4,15 @@ import plotly.io as pio
 import os
 import threading
 pio.templates.default = 'simple_white'
-use_neuroplay=True
-if use_neuroplay:
-    neuroplay_loc='/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
-    def run_neuroplay():
-        neuroplay_loc = '/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
-        os.system(f'bash {neuroplay_loc}')
-    neuroplay_thread = threading.Thread(target=run_neuroplay)
-    neuroplay_thread.daemon = True
-    neuroplay_thread.start()
+# use_neuroplay=True
+# if use_neuroplay:
+#     neuroplay_loc='/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
+#     def run_neuroplay():
+#         neuroplay_loc = '/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
+#         os.system(f'bash {neuroplay_loc}')
+#     neuroplay_thread = threading.Thread(target=run_neuroplay)
+#     neuroplay_thread.daemon = True
+#     neuroplay_thread.start()
 
 app = dash.Dash(__name__, use_pages=True, external_stylesheets=[dbc.themes.FLATLY])
 server = app.server

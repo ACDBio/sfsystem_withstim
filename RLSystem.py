@@ -19,15 +19,15 @@ import shutil
 plotly.io.json.config.default_engine = 'orjson'
 websocket.enableTrace(False)
 
-#use_neuroplay=True
-# if use_neuroplay:
-#     neuroplay_loc='/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
-#     def run_neuroplay():
-#         neuroplay_loc = '/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
-#         os.system(f'bash {neuroplay_loc}')
-#     neuroplay_thread = threading.Thread(target=run_neuroplay)
-#     neuroplay_thread.daemon = True
-#     neuroplay_thread.start()
+use_neuroplay=True
+if use_neuroplay:
+    neuroplay_loc='/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
+    def run_neuroplay():
+        neuroplay_loc = '/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
+        os.system(f'bash {neuroplay_loc}')
+    neuroplay_thread = threading.Thread(target=run_neuroplay)
+    neuroplay_thread.daemon = True
+    neuroplay_thread.start()
 
 def get_random_css_color_names(n, seed=333):
     """
@@ -533,10 +533,11 @@ class SFSystemCommunicator(gym.Env):
                     break;
             except:
                 pass
-    def start_data_transfer_from_device(self):
-        self.ws_sf.send("start_data_transfer_from_ads")
-    def stop_data_transfer_from_device(self):
-        self.ws_sf.send("stop_data_transfer_from_ads")
+
+    # def start_data_transfer_from_device(self):
+    #     self.ws_sf.send("start_data_transfer_from_ads")
+    # def stop_data_transfer_from_device(self):
+    #     self.ws_sf.send("stop_data_transfer_from_ads")
     def stop_audiovis_feedback(self):
         self.ws_sf.send("stop_led_cycle")
     
@@ -557,19 +558,22 @@ class SFSystemCommunicator(gym.Env):
         y=1*np.sin(2*np.pi*signal_freq*self.timesteps)
         return y
     def sample_observations(self, use_synth_data=False): #True for testing of fft etc., False - for actual application
+        if self.use_sf==True:
+            self.ws_sf.send("start_data_transfer_from_ads")
         self.raw_data=[]
-        np_unsampled=True
+        # np_unsampled=True
         if self.use_neuroplay==True:
-            while np_unsampled:
-                try:
-                    if self.use_unfiltered_np_data==True:
-                        self.ws_np.send('RawData')
-                    else:
-                        self.ws_np.send('FilteredData')
-                    self.current_sample_np=np.array(json.loads(self.ws_np.recv())['data'])
-                    np_unsampled=False
-                except Exception as e:
-                    print(e)
+        #     while np_unsampled:
+            try:
+                if self.use_unfiltered_np_data==True:
+                    self.ws_np.send('RawData')
+                else:
+                    self.ws_np.send('FilteredData')
+                self.current_sample_np=np.array(json.loads(self.ws_np.recv())['data'])
+                #np_unsampled=False
+            except Exception as e:
+                print(e)
+                return False
 
         else:
             self.current_sample_np==np.zeros(shape=(8,1250))
@@ -577,7 +581,6 @@ class SFSystemCommunicator(gym.Env):
                 self.raw_data.append(i[-self.n_timepoints_per_sample:])   
 
         if self.use_sf==True:
-            self.ws_sf.send("start_data_transfer_from_ads")
             self.current_sample_sf=json.loads(self.ws_sf.recv())
             self.ws_sf.send("stop_data_transfer_from_ads")
             for key, value in self.current_sample_sf.items():
@@ -606,9 +609,12 @@ class SFSystemCommunicator(gym.Env):
         self.raw_data=np.array(self.raw_data, dtype=float).transpose()    
         #elf.raw_data_all=self.raw_data
         self.raw_data=self.raw_data[:,self.channels_of_interest_inds]
+        return True
     def sample_and_process_observations_from_device(self):
+        self.correct_observations=False
         new_observations=dict()
-        self.sample_observations()
+        while self.correct_observations==False:
+            self.correct_observations=self.sample_observations()
         new_observations['raw_data']=self.raw_data
         if self.do_fft:
          self.fft=self.get_fft_allchannels(raw_data=self.raw_data)
@@ -827,7 +833,7 @@ class SFSystemCommunicator(gym.Env):
                 self.write_tolog(json.dumps({'Best action across episodes reward':self.overall_max_reward}))
                 self.write_tolog(actionstring)
         self.stop_audiovis_feedback() #just in case
-        self.stop_data_transfer_from_device() #just in case
+        self.ws_sf.send("stop_data_transfer_from_ads") #just in case
         self.cur_step=0 #just in case
         self.current_episode=0
 
@@ -967,6 +973,7 @@ class stable_baselines_model_trainer():
         if  self.env.use_neuroplay==True:
             if self.env.write_edf_ann==True:
                 self.env.start_edf_log()
+                print('EDF log started')
 
 
     def direct_feedback_run(self, reward_mapping_min, reward_mapping_max, overlay_random, mapped_outputs, min_space_value=-1, max_space_value=1):
@@ -1074,7 +1081,9 @@ class stable_baselines_model_trainer():
                             if self.env.use_neuroplay==True:
                                 if self.env.write_edf_ann==True:
                                     self.env.write_edf_annotation_fn(f't_episode_{i}', self.env.delay)
+                            #print('h1')
                             self.model.learn(total_timesteps=log_or_plot_every_n_timesteps)
+                            #print('h2')
                             #print(self.env.enc_is_clicked)
                             #print(self.env.current_sample)
                             self.cur_n_timesteps+=log_or_plot_every_n_timesteps
