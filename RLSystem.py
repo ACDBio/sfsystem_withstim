@@ -15,6 +15,7 @@ import os
 import webcolors
 import random
 import threading
+import shutil
 plotly.io.json.config.default_engine = 'orjson'
 use_neuroplay=True
 websocket.enableTrace(False)
@@ -116,8 +117,8 @@ class SFSystemCommunicator(gym.Env):
                  use_unfiltered_np_data=True,
                  write_edf_ann=False,
                  edf_ann_fn='default_edf',
-                 edf_steps_annotation=True,
-                 edf_rf_annotation=True,
+                 edf_step_annotation=False,
+                 edf_rf_annotation=False,
                  edf_rf_annotation_threshold=1):
         
         self.ws_sf=None
@@ -142,8 +143,9 @@ class SFSystemCommunicator(gym.Env):
         #edf writing
         self.write_edf_ann=write_edf_ann
         self.edf_ann_fn=edf_ann_fn
-        self.edfpath=f'{os.getcwd}/{edf_ann_fn}'
-        self.edf_steps_annotation=edf_steps_annotation
+        self.edf_step_annotation=edf_step_annotation
+        self.edffolder=f'{os.getcwd()}/{edf_ann_fn}'
+        self.edfpath=f'{os.getcwd()}/{edf_ann_fn}/{edf_ann_fn}'
         self.edf_rf_annotation=edf_rf_annotation
         self.edf_rf_annotation_threshold=edf_rf_annotation_threshold
 
@@ -267,7 +269,18 @@ class SFSystemCommunicator(gym.Env):
         self.colornames=color_names
         self.cur_action_log_no=0
 
+    def start_edf_log(self):
+        self.ws_np.send(f'StartRecord?path={self.edfpath}')
+        self.ws_np.recv()
     
+    def stop_edf_log(self):
+        self.ws_np.send('StopRecord')
+        self.ws_np.recv()
+
+    def write_edf_annotation_fn(self, ann_text, ann_duration_ms):
+        self.ws_np.send(f'AddEDFAnnotation?duration={ann_duration_ms}&text={ann_text}')
+        self.ws_np.recv()
+
     def create_log(self):
         if not os.path.isfile(self.logfn):
             open(self.logfn, 'a').close()
@@ -321,6 +334,9 @@ class SFSystemCommunicator(gym.Env):
     def clear_log(self):
         if os.path.isfile(self.logfn):
             os.remove(self.logfn)
+        if self.write_edf_ann:
+            if os.path.isdir(self.edffolder):
+                shutil.rmtree(self.edffolder)
     def set_value_dict_for_reward_function(self):
         ftokens=re.split(r'[+/)(*]+',self.reward_formula_string)
         self.rewarddict={}
@@ -534,7 +550,7 @@ class SFSystemCommunicator(gym.Env):
         return y
     def sample_observations(self, use_synth_data=False): #True for testing of fft etc., False - for actual application
         self.raw_data=[]
-        np_unsampled=False
+        np_unsampled=True
         if self.use_neuroplay==True:
             while np_unsampled:
                 try:
@@ -543,7 +559,7 @@ class SFSystemCommunicator(gym.Env):
                     else:
                         self.ws_np.send('FilteredData')
                     self.current_sample_np=np.array(json.loads(self.ws_np.recv())['data'])
-                    np_unsampled=True
+                    np_unsampled=False
                 except Exception as e:
                     print(e)
 
@@ -563,8 +579,15 @@ class SFSystemCommunicator(gym.Env):
                     else:
                         if key=='enc_is_clicked':
                             self.enc_is_clicked=value[0]
+                            if self.enc_is_clicked==1:
+                                if self.write_edf_ann==True:
+                                    self.write_edf_annotation_fn(ann_text='enc_click',ann_duration_ms=self.delay)
                         if key=='enc_is_holded':
                             self.enc_is_holded=value[0]
+                            if self.enc_is_holded==1:
+                                if self.write_edf_ann==True:
+                                    self.write_edf_annotation_fn(ann_text='enc_holded',ann_duration_ms=self.delay)
+
                 else:
                     self.raw_data.append(self.synth_data())
             #self.raw_data_sf=np.array(self.raw_data).transpose()
@@ -601,7 +624,12 @@ class SFSystemCommunicator(gym.Env):
                 self.write_tolog(json.dumps({'raw_data':self.cur_observations['raw_data'].tolist()}))
     def step(self, action):
         #print(action)
+        actionstring=self.get_json_string_from_ordered_dict(action)
         if self.ws_sf.sock is not None:
+            if self.write_edf_ann==True:
+                if self.edf_step_annotation==True:
+                    self.write_edf_annotation_fn(ann_text=f'episode_{self.current_episode}_step_{self.cur_step}', ann_duration_ms=self.step_stim_length_millis)
+
             self.done=False
             self.best_overall_reward_now=False
             self.best_episode_reward_now=False
@@ -618,26 +646,49 @@ class SFSystemCommunicator(gym.Env):
             reward_val=reward.tolist()
             self.reward_cur=reward
             self.total_cur_episode_reward+=reward_val
+            if self.write_edf_ann==True:
+                if self.edf_step_annotation==True:
+                    anntxt=f'sr_{np.round(reward_val,4)}_tcer_{np.round(self.total_cur_episode_reward,4)}' #f'step_reward_{reward_val}_total_current_episode_reward_{self.total_cur_episode_reward}_action_{actionstring}'
+                    self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
+
+
+
+            if self.write_edf_ann:
+                if self.edf_rf_annotation:
+                    if reward_val>self.edf_rf_annotation_threshold:
+                        self.write_edf_annotation_fn(ann_text=f'r_{self.reward_formula_string}_t_{self.edf_rf_annotation_threshold}', ann_duration_ms=self.delay)
+
             if reward_val>=self.episode_max_reward:
                     self.episode_max_reward=reward_val
                     self.best_episode_reward_now=True
                     self.best_action_episode=action
+
             if reward_val>=self.overall_max_reward:
                     #print('setting best overall reward')
                     self.overall_max_reward=reward_val
                     self.best_overall_reward_now=True
                     self.best_action_overall=action
+                    if self.write_edf_ann==True:
+                        anntxt=f'comr_{np.round(reward_val,4)}' #f'current_overall_max_reward_{reward_val}_action_{actionstring}_inprev_{self.step_stim_length}_s'
+                        self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
+
+
             if self.total_cur_episode_reward>=self.total_episode_max_reward:
                 self.total_episode_max_reward=self.total_cur_episode_reward
                 self.best_total_episode_reward_now=True
+                if self.write_edf_ann==True:
+                    anntxt=f'temr_{np.round(self.total_cur_episode_reward,4)}'#f'current_overall_max_reward_{reward_val}_action_{actionstring}_inprev_{self.step_stim_length}_s'
+                    self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
+
 
             if self.collect_data_toplot:
                 self.cur_episode_rewards.append(reward_val)
             if self.log_steps:
                 self.write_tolog(json.dumps({'Episode':self.current_episode, 'Step': self.cur_step, 'Step reward': reward_val}))
+                
             if self.log_actions_every_step:
+                self.write_tolog(json.dumps({'Action:':reward_val}))
                 self.write_tolog(json.dumps({'Action reward':reward_val}))
-                actionstring=self.get_json_string_from_ordered_dict(action)
                 self.write_tolog(actionstring)
             self.write_signal_logs()        
                 
@@ -774,6 +825,10 @@ class SFSystemCommunicator(gym.Env):
 
         self.clear_reward_buffers()
         self.clear_reward_stats()
+        try:
+            self.stop_edf_log()
+        except Exception as e:
+            print(f'On env close received {e}')
         if clear_log:
             self.clear_log()
         if self.ws_sf.sock is not None:
