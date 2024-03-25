@@ -453,8 +453,8 @@ class SFSystemCommunicator(gym.Env):
                 print('Neuroplay connected.')
                 self.ws_np.send('startDevice?id=0')
                 print(self.ws_np.recv())
-                #self.ws_np.send('EnableDataGrabMode')
-                #print(self.ws_np.recv())
+                self.ws_np.send('EnableDataGrabMode')
+                print(self.ws_np.recv())
                 self.ws_np.send('CurrentDeviceInfo')
                 self.np_info=json.loads(self.ws_np.recv())
                 self.np_freq=self.np_info['currentFrequency']
@@ -566,9 +566,9 @@ class SFSystemCommunicator(gym.Env):
         #     while np_unsampled:
             try:
                 if self.use_unfiltered_np_data==True:
-                    self.ws_np.send('RawData')
+                    self.ws_np.send('grabRawData')
                 else:
-                    self.ws_np.send('FilteredData')
+                    self.ws_np.send('grabFilteredData')
                 self.current_sample_np=np.array(json.loads(self.ws_np.recv())['data'])
                 #np_unsampled=False
             except Exception as e:
