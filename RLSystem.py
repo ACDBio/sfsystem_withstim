@@ -120,6 +120,9 @@ class SFSystemCommunicator(gym.Env):
                  edf_rf_annotation=True,
                  edf_rf_annotation_threshold=1):
         
+        self.ws_sf=None
+        self.ws_neuroplay=None
+
         self.channel_spec=channel_spec
         self.sel_input_channels=input_channels
         self.all_input_channels=list(self.channel_spec.values())
@@ -194,7 +197,7 @@ class SFSystemCommunicator(gym.Env):
         self.channels_of_interest_inds.sort()
         self.n_channels_of_interest=len(self.channels_of_interest_inds)
 
-        self.set_fft_params()
+       # self.set_fft_params()
 
         self.timesleep_period=0.1
 
@@ -209,11 +212,15 @@ class SFSystemCommunicator(gym.Env):
             self.do_fft=True
             self.do_fbins=True
         
+        #self.init_action_space()
+        #self.init_observation_space()
+        #self.set_value_dict_for_reward_function()
+        self.connect()
+        self.set_delay_and_data_transfer_buffer_size()
+        self.set_fft_params()
         self.init_action_space()
         self.init_observation_space()
         self.set_value_dict_for_reward_function()
-        self.connect()
-        self.set_delay_and_data_transfer_buffer_size()
         if self.only_pos_encoder_mode:
             self.set_pos_encoder_mode()
         print('Delay and data transfer buffer size are set up.')
@@ -424,14 +431,13 @@ class SFSystemCommunicator(gym.Env):
                 print(self.ws_np.recv())
                 #self.ws_np.send('EnableDataGrabMode')
                 #print(self.ws_np.recv())
+                self.ws_np.send('CurrentDeviceInfo')
+                self.np_info=json.loads(self.ws_np.recv())
+                self.np_freq=self.np_info['currentFrequency']
 
         
     def set_pos_encoder_mode(self):
         self.ws_sf.send('use_only_pos_enc_mode')
-        msg=self.ws_sf.recv()
-        print(msg)
-    def set_use_directional_enc_mode(self):
-        self.ws_sf.send('use_directional_enc_mode')
         msg=self.ws_sf.recv()
         print(msg)
     
@@ -485,6 +491,12 @@ class SFSystemCommunicator(gym.Env):
         self.ws_sf.send("set_delay_and_data_transfer_buffer_size")
         time.sleep(self.timesleep_period)
         setup=False
+        if self.use_neuroplay==True:
+            self.np_delay=int(1000/self.np_freq)
+            if self.delay!=self.np_delay:
+                print(f'Setting delay to {self.np_delay} to match neuroplay sampling frequency')
+                self.delay=self.np_delay
+
         while setup==False:
             try:
                 device_msg=self.ws_sf.recv()
@@ -522,12 +534,18 @@ class SFSystemCommunicator(gym.Env):
         return y
     def sample_observations(self, use_synth_data=False): #True for testing of fft etc., False - for actual application
         self.raw_data=[]
+        np_unsampled=False
         if self.use_neuroplay==True:
-            if self.use_unfiltered_np_data==True:
-                self.ws_np.send('RawData')
-            else:
-                self.ws_np.send('FilteredData')
-            self.current_sample_np=np.array(json.loads(self.ws_np.recv())['data'])
+            while np_unsampled:
+                try:
+                    if self.use_unfiltered_np_data==True:
+                        self.ws_np.send('RawData')
+                    else:
+                        self.ws_np.send('FilteredData')
+                    self.current_sample_np=np.array(json.loads(self.ws_np.recv())['data'])
+                    np_unsampled=True
+                except Exception as e:
+                    print(e)
 
         else:
             self.current_sample_np==np.zeros(shape=(8,1250))
@@ -760,6 +778,8 @@ class SFSystemCommunicator(gym.Env):
             self.clear_log()
         if self.ws_sf.sock is not None:
             self.ws_sf.close()
+        if self.ws_np is not None:
+            self.ws_np.close()
         
                
 
