@@ -17,17 +17,17 @@ import random
 import threading
 import shutil
 plotly.io.json.config.default_engine = 'orjson'
-use_neuroplay=True
 websocket.enableTrace(False)
 
-if use_neuroplay:
-    neuroplay_loc='/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
-    def run_neuroplay():
-        neuroplay_loc = '/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
-        os.system(f'bash {neuroplay_loc}')
-    neuroplay_thread = threading.Thread(target=run_neuroplay)
-    neuroplay_thread.daemon = True
-    neuroplay_thread.start()
+#use_neuroplay=True
+# if use_neuroplay:
+#     neuroplay_loc='/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
+#     def run_neuroplay():
+#         neuroplay_loc = '/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
+#         os.system(f'bash {neuroplay_loc}')
+#     neuroplay_thread = threading.Thread(target=run_neuroplay)
+#     neuroplay_thread.daemon = True
+#     neuroplay_thread.start()
 
 def get_random_css_color_names(n, seed=333):
     """
@@ -275,6 +275,14 @@ class SFSystemCommunicator(gym.Env):
     
     def stop_edf_log(self):
         self.ws_np.send('StopRecord')
+        self.ws_np.recv()
+
+    def pause_edf_log(self):
+        self.ws_np.send('PauseRecord')
+        self.ws_np.recv()
+    
+    def continue_edf_log(self):
+        self.ws_np.send('ContinueRecord')
         self.ws_np.recv()
 
     def write_edf_annotation_fn(self, ann_text, ann_duration_ms):
@@ -954,9 +962,18 @@ class stable_baselines_model_trainer():
             open(self.logfn, 'a').close()
         with open(self.logfn, 'a') as log_file:
             log_file.write(json.dumps(self.env_data) + '\n')
+
         self.default_env_actions=self.env.flatten_and_normalize_action(self.orig_env.action_space, self.env.default_actions)
+        if  self.env.use_neuroplay==True:
+            if self.env.write_edf_ann==True:
+                self.env.start_edf_log()
+
 
     def direct_feedback_run(self, reward_mapping_min, reward_mapping_max, overlay_random, mapped_outputs, min_space_value=-1, max_space_value=1):
+        if  self.env.use_neuroplay==True:
+            if self.env.write_edf_ann==True:
+                self.env.write_edf_annotation_fn('started_direct_feedback_run', self.env.delay)
+        
         #dont forget to run at least one iteration of the environment for reward setup
         reward=self.env.reward
         reward_scaled=(reward-reward_mapping_min)/(reward_mapping_max-reward_mapping_min)
@@ -1005,8 +1022,14 @@ class stable_baselines_model_trainer():
         return
 
     def static_launch(self):
+        if  self.env.use_neuroplay==True:
+            if self.env.write_edf_ann==True:
+                self.env.write_edf_annotation_fn('started_static_run', self.env.delay)
         self.orig_env.step(self.orig_env.default_actions)
     def dynamic_launch(self):
+        if self.env.use_neuroplay==True:
+            if self.env.write_edf_ann==True:
+                self.env.write_edf_annotation_fn('started_dynamic_run', self.env.delay)
         self.env.step(self.env.action_space.sample())
     def set_model(self):
         if self.algorithm=='PPO':
@@ -1035,7 +1058,10 @@ class stable_baselines_model_trainer():
         self.n_total_timesteps=n_total_timesteps
         self.num_episodes=num_episodes
         env_paused=False
-        if self.env.ws.sock is not None:
+        if self.env.use_neuroplay==True:
+            if self.env.write_edf_ann==True:
+                self.env.write_edf_annotation_fn('started_training_run', self.env.delay)
+        if self.env.ws_sf.sock is not None:
             self.training_completed=False
             #if n_total_timesteps=='episode':
             #    n_total_timesteps=int(self.env.n_steps_per_episode/self.n_steps_per_timestep) #we run one episode + 1 step before resetting, episode 
@@ -1043,8 +1069,11 @@ class stable_baselines_model_trainer():
                 self.cur_episode_no=i
                 self.cur_n_timesteps=0
                 while self.cur_n_timesteps<int(n_total_timesteps): #here-for A2C
-                    if self.env.ws.sock is not None:
+                    if self.env.ws_sf.sock is not None:
                         if env_paused==False:
+                            if self.env.use_neuroplay==True:
+                                if self.env.write_edf_ann==True:
+                                    self.env.write_edf_annotation_fn(f't_episode_{i}', self.env.delay)
                             self.model.learn(total_timesteps=log_or_plot_every_n_timesteps)
                             #print(self.env.enc_is_clicked)
                             #print(self.env.current_sample)
