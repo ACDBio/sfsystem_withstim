@@ -298,6 +298,21 @@ layout=html.Div(
                 dcc.Slider(id='signal_plot_width',min=500, max=5000, step=100, value=2000, marks=None, tooltip={"placement": "bottom", "always_visible": True, "template": "{value} px"}),  
                 'Signal plot height: ',
                 dcc.Slider(id='signal_plot_height',min=50, max=5000, step=50, value=1500, marks=None, tooltip={"placement": "bottom", "always_visible": True, "template": "{value} px"}),                  
+                html.Br(),
+                'Neuroplay EDF logging',
+                html.Hr(),
+                dcc.Checklist(options=['Write EDF log'], value=['Write EDF log'], id='write_edf_ann'),
+                ' ',
+                dcc.Checklist(options=['Annotate steps in EDF'], value=['Annotate steps in EDF'], id='edf_step_annotation'),
+                ' ',
+                dcc.Checklist(options=['Annotate reward above threshold in EDF'], value=['Annotate reward above threshold in EDF'], id='edf_rf_annotation'),
+                ' ',
+                'Reward threshold: ',
+                dcc.Input(type='number', placeholder='Reward value', value=1, id='edf_rf_annotation_threshold'), 
+                html.Hr(),
+                html.Br(),                          
+               
+               
                 ])             
             ]),
             html.Br(),
@@ -814,6 +829,14 @@ def get_state_from_model_logfile(logfile=None):
           State('action_log_name','value'),
           State('action_text', 'value'),
 
+
+          State('write_edf_ann', 'value'),
+          State('edf_step_annotation','value'),
+          State('edf_rf_annotation','value'),
+          State('edf_rf_annotation_threshold','value'),
+          State('session_name','value'),
+
+
           prevent_initial_call=True)
 def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, n_clicks_stop_direct_feedback, 
                      n_clicks_run_action,  n_clicks_action_from_string,
@@ -827,7 +850,27 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                      pause_on_click,
                      log_actions_on_hold,
                      action_log_name,
-                    action_text):
+                    action_text,
+                    write_edf_ann,
+                    edf_step_annotation,
+                    edf_rf_annotation,
+                    edf_rf_annotation_threshold,
+                    session_name):
+    
+
+    edf_ann_fn=session_name+'_edf'
+    if len(edf_rf_annotation)>0:
+        edf_rf_annotation=True
+    else:
+        edf_rf_annotation=False
+    if len(edf_step_annotation)>0:
+        edf_step_annotation=True
+    else:
+        edf_step_annotation=False
+    if len(write_edf_ann)>0:
+        write_edf_ann=True
+    else:
+        write_edf_ann=False
     global env
     global trainer
     timer_interval_ms=timer_interval_mins*60*1000
@@ -891,7 +934,12 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 colors=sigplot_colors,
                                                 log_actions_on_hold=log_actions_on_hold,
                                                 channel_spec=channel_spec,
-                                                use_unfiltered_np_data=sd['use_unfiltered_np_data'])
+                                                use_unfiltered_np_data=sd['use_unfiltered_np_data'],
+                                                edf_rf_annotation=edf_rf_annotation,
+                                                edf_rf_annotation_threshold=edf_rf_annotation_threshold,
+                                                edf_step_annotation=edf_step_annotation,
+                                                write_edf_ann=write_edf_ann,
+                                                edf_ann_fn=edf_ann_fn)
 
                 #print(sd)
             #print(out_dict)
@@ -1009,7 +1057,12 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                               colors=sigplot_colors,
                                               log_actions_on_hold=log_actions_on_hold,
                                               channel_spec=channel_spec,
-                                              use_unfiltered_np_data=sd['use_unfiltered_np_data'])    
+                                              use_unfiltered_np_data=sd['use_unfiltered_np_data'],
+                                              edf_rf_annotation=edf_rf_annotation,
+                                            edf_rf_annotation_threshold=edf_rf_annotation_threshold,
+                                            edf_step_annotation=edf_step_annotation,
+                                            write_edf_ann=write_edf_ann,
+                                            edf_ann_fn=edf_ann_fn)    
         trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                             algorithm=sd['algorithm'],
                                                             policy='MlpPolicy',
