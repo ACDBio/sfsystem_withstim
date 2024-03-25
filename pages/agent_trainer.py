@@ -49,6 +49,13 @@ def get_dir_tree(dirloc):
             results.append('  '+filename)
         results.append(html.Br())
     return results[2:]
+def copy_directory(src_dir, dest_dir):
+    # Ensure the destination directory exists
+    if not os.path.exists(dest_dir):
+        os.makedirs(dest_dir)
+
+    # Copy the directory and all its contents
+    shutil.copytree(src_dir, dest_dir)
 
 layout=html.Div(
     [dcc.Store(id='run_type', data=None),
@@ -665,6 +672,9 @@ def copy_session_logs_to_lib(n_clicks, sname):
             copy_file(f'./{f}', session_dir)
         if 'act' in f:  #copy actions
             copy_file(f'./{f}', session_dir)
+        if f==f'{sname}_edf':
+            src_dir=os.getcwd()+'/'+f'{sname}_edf'
+            copy_directory(src_dir, session_dir)
     return get_dir_tree('./session_lib')
 
 @callback(Output('session_library', 'data', allow_duplicate=True),
