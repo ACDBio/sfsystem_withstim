@@ -11,6 +11,7 @@ import json
 from dash.exceptions import PreventUpdate
 import shutil
 from datetime import datetime
+import time
 channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',6:'np_C4',7:'np_P4',8:'np_O2',
               9:'sf_ch1',10:'sf_ch2',11:'sf_ch3',12:'sf_ch4',13:'sf_ch5',14:'sf_ch6',15:'sf_ch7',16:'sf_ch8',17:'sf_enc'}
 
@@ -182,7 +183,7 @@ layout=html.Div(
                 'N timepoints per sample: ',
                 dcc.Input(type='number', placeholder='N points', value=100, id='n_timepoints_per_sample'),
                 html.Br(),               
-                'Delay between datapoints (if neuroplay is used,   will be set aautomatically to match): ',
+                'Delay between datapoints (if Neuroplay is used,   will be set aautomatically to match): ',
                 dcc.Input(type='number', placeholder='Delay, ms', value=10, id='delay'), 
                 html.Br(), 
                 'Max ADS output: ',
@@ -950,6 +951,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 edf_step_annotation=edf_step_annotation,
                                                 write_edf_ann=write_edf_ann,
                                                 edf_ann_fn=edf_ann_fn)
+        time.sleep(5)    
 
                 #print(sd)
             #print(out_dict)
@@ -1073,6 +1075,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                             edf_step_annotation=edf_step_annotation,
                                             write_edf_ann=write_edf_ann,
                                             edf_ann_fn=edf_ann_fn)    
+        time.sleep(5) 
         trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                             algorithm=sd['algorithm'],
                                                             policy='MlpPolicy',
@@ -1233,6 +1236,11 @@ def start_training(sd):
 
     except Exception as e:
         print(f"Training thread terminated: {e}")
+        try:
+            env.close()
+        except Exception as e2:
+            print(e2)
+        
 
 def start_session_static():
     global env
@@ -1243,8 +1251,8 @@ def start_session_static():
         print(f"Training thread terminated: {e}")
         try:
             trainer.env.close()
-        except Exception as e:
-            print(f"On environment closure: {e}")
+        except Exception as e2:
+            print(f"On environment closure: {e2}")
 def start_session_notrain(arg):
     global env
     global trainer
@@ -1273,8 +1281,8 @@ def start_session_notrain(arg):
             print(f"Training thread terminated: {e}")
             try:
                 trainer.env.close()
-            except Exception as e:
-                print(f"On environment closure: {e}")
+            except Exception as e2:
+                print(f"On environment closure: {e2}")
             break
             
 

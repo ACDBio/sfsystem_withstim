@@ -122,6 +122,8 @@ class SFSystemCommunicator(gym.Env):
                  edf_rf_annotation=False,
                  edf_rf_annotation_threshold=1):
         
+
+        self.current_actions=None
         self.ws_sf=None
         self.ws_neuroplay=None
 
@@ -451,14 +453,24 @@ class SFSystemCommunicator(gym.Env):
             self.ws_np.connect("ws://localhost:1336/")
             self.ws_connection_status=self.ws_np.connected
             if self.ws_connection_status==True:
-                print('Neuroplay connected.')
+                devcount=0
+                self.ws_np.send('StartSearch')
+                print(self.ws_np.recv())
+                while devcount==0:
+                    self.ws_np.send('DeviceCount')
+                    devcount=json.loads(self.ws_np.recv())["deviceCount"]
+
+
                 self.ws_np.send('startDevice?id=0')
+                print('Neuroplay connected.')
                 print(self.ws_np.recv())
                 self.ws_np.send('EnableDataGrabMode')
                 print(self.ws_np.recv())
                 self.ws_np.send('CurrentDeviceInfo')
                 self.np_info=json.loads(self.ws_np.recv())
                 self.np_freq=self.np_info['currentFrequency']
+                print(self.np_info)
+                print('Neuroplay device data received')
 
         
     def set_pos_encoder_mode(self):
@@ -639,6 +651,7 @@ class SFSystemCommunicator(gym.Env):
                 self.write_tolog(json.dumps({'raw_data':self.cur_observations['raw_data'].tolist()}))
     def step(self, action):
         #print(action)
+        self.current_actions=action
         actionstring=self.get_json_string_from_ordered_dict(action)
         if self.ws_sf.sock is not None:
             if self.write_edf_ann==True:
@@ -652,7 +665,6 @@ class SFSystemCommunicator(gym.Env):
 
 
             self.update_audiovis_feedback(update_dict=action)
-            self.current_actions=action
             time.sleep(self.step_stim_length)
             
             new_observations=self.sample_and_process_observations_from_device()
@@ -974,7 +986,8 @@ class stable_baselines_model_trainer():
         if  self.env.use_neuroplay==True:
             if self.env.write_edf_ann==True:
                 self.env.start_edf_log()
-                print('EDF log started')
+                print('EDF log started:')
+                print(self.env.edfpath)
 
 
     def direct_feedback_run(self, reward_mapping_min, reward_mapping_max, overlay_random, mapped_outputs, min_space_value=-1, max_space_value=1):
@@ -1063,6 +1076,7 @@ class stable_baselines_model_trainer():
         self.env.close()
 
     def train(self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps=1, log_or_plot_every_n_timesteps=1, jnb=False,  pause_on_click=False):
+        print(self.env.edfpath)
         self.n_total_timesteps=n_total_timesteps
         self.num_episodes=num_episodes
         env_paused=False
@@ -1121,7 +1135,8 @@ class stable_baselines_model_trainer():
                         break
             
             self.env.stop_audiovis_feedback()
-            self.training_completed=True     
+            self.training_completed=True 
+            self.env.pause_edf_log()   
             return     
         else:
             print('No connection.')
