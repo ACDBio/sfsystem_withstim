@@ -11,6 +11,8 @@ import json
 from dash.exceptions import PreventUpdate
 import shutil
 from datetime import datetime
+channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',6:'np_C4',7:'np_P4',8:'np_O2',
+              9:'sf_ch1',10:'sf_ch2',11:'sf_ch3',12:'sf_ch4',13:'sf_ch5',14:'sf_ch6',15:'sf_ch7',16:'sf_ch8',17:'sf_enc'}
 
 
 dash.register_page(__name__,'/')
@@ -164,16 +166,16 @@ layout=html.Div(
             html.Hr(),
             dbc.Col(width='auto', children=[
             html.Div(children=[
-                'Total channel count: ',
-                dcc.Input(type='number', placeholder='N channels', value=9, id='n_input_channels'),
-                html.Br(),
-                'Channels to observe (indexes, 0-based): ',
-                dcc.Input(type='text', placeholder='Channels of interest idx0,...idxn', value='0,1,2,3,4,5,6,7,8', id='channels_of_interest_inds'),
+                #'Total channel count: ',
+                #dcc.Input(type='number', placeholder='N channels', value=9, id='n_input_channels'),
+                #html.Br(),
+                'Channels to observe: ',
+                dcc.Input(type='text', placeholder='Channels of interest ch0,...chn', value='np_O1,np_P3,np_C3,np_F3,np_F4,np_C4,np_P4,np_O2,sf_enc', id='channels_of_interest', size=100),
                 html.Br(),
                 'N timepoints per sample: ',
                 dcc.Input(type='number', placeholder='N points', value=100, id='n_timepoints_per_sample'),
                 html.Br(),               
-                'Delay between datapoints: ',
+                'Delay between datapoints (if neuroplay is used,   will be set aautomatically to match): ',
                 dcc.Input(type='number', placeholder='Delay, ms', value=10, id='delay'), 
                 html.Br(), 
                 'Max ADS output: ',
@@ -181,7 +183,9 @@ layout=html.Div(
                 html.Br(),         
                 'Data types to use in observational space: ',
                 dcc.Dropdown(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Raw signal values','Frequency spectra', 'Frequency bin values'], id='obs_space_opts', multi=True), 
-                html.Br(),                
+                html.Br(),      
+                dcc.Checklist(id='use_unfiltered_np_data',options=['Use unfiltered Neuroplaay signal'],  value=['Use unfiltered Neuroplaay signal']),
+                html.Br(),           
                 ]
             ),
 
@@ -853,8 +857,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         if trigger_id=="run_timer":
             sd['step_stim_length_millis']=timer_signal_duration_s*1000
         env = SFSystemCommunicator(out_dict=out_dict,
-                                                n_input_channels=sd['n_input_channels'],
-                                                channels_of_interest_inds=sd['channels_of_interest_inds'],
+                                                #n_input_channels=sd['n_input_channels'],
+                                                input_channels=sd['channels_of_interest'],
                                                 n_timepoints_per_sample=sd['n_timepoints_per_sample'],
                                                 max_sfsystem_output=sd['max_sfsystem_output'],
                                                 reward_formula_string=sd['reward_formula_string'],
@@ -885,7 +889,9 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 only_pos_encoder_mode=sd['only_pos_encoder_mode'],
                                                 use_abs_values_for_raw_data_in_reward=sd['use_abs_values_for_raw_data_in_reward'],
                                                 colors=sigplot_colors,
-                                                log_actions_on_hold=log_actions_on_hold)
+                                                log_actions_on_hold=log_actions_on_hold,
+                                                channel_spec=channel_spec,
+                                                use_unfiltered_np_data=sd['use_unfiltered_np_data'])
 
                 #print(sd)
             #print(out_dict)
@@ -970,7 +976,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         
         env = SFSystemCommunicator(out_dict=out_dict,
                                               n_input_channels=sd['n_input_channels'],
-                                              channels_of_interest_inds=sd['channels_of_interest_inds'],
+                                              channels_of_interest=sd['channels_of_interest'],
                                               n_timepoints_per_sample=sd['n_timepoints_per_sample'],
                                               max_sfsystem_output=sd['max_sfsystem_output'],
                                               reward_formula_string=sd['reward_formula_string'],
@@ -1001,7 +1007,9 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                               only_pos_encoder_mode=sd['only_pos_encoder_mode'],
                                               use_abs_values_for_raw_data_in_reward=sd['use_abs_values_for_raw_data_in_reward'],
                                               colors=sigplot_colors,
-                                              log_actions_on_hold=log_actions_on_hold)    
+                                              log_actions_on_hold=log_actions_on_hold,
+                                              channel_spec=channel_spec,
+                                              use_unfiltered_np_data=sd['use_unfiltered_np_data'])    
         trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                             algorithm=sd['algorithm'],
                                                             policy='MlpPolicy',
@@ -1238,8 +1246,7 @@ def start_session_notrain(arg):
               Input('phasor_1_span', 'value'),
               Input('phasor_2_span', 'value'),
               Input('maxivolume','value'),
-              Input('n_input_channels','value'),
-              Input('channels_of_interest_inds','value'),
+              Input('channels_of_interest','value'),
               Input('n_timepoints_per_sample','value'),
               Input('delay','value'),
               Input('max_sfsystem_output','value'),
@@ -1263,20 +1270,23 @@ def start_session_notrain(arg):
               Input('render_data','value'),
               Input('stim_length_on_reset','value'),
               Input('data_proc_options', 'value'),
+
+              Input('use_unfiltered_np_data', 'value'),
               prevent_initial_call=False)
 def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
                      l1c,l2c,l3c,l4c,l5c,l6c,l7c,l8c,sound_wave_frange,
                      w1f, w2f, w1sh, w2sh, volrange, panner_phasor_frange,panner_freq,
                      panner_div_range,panner_div, phasor_1_freq,phasor_2_freq,phasor_1_span,
                      phasor_2_span,maxivolume, 
-                     n_input_channels, channels_of_interest_inds,n_timepoints_per_sample,
+                      channels_of_interest,n_timepoints_per_sample,
                      delay,max_sfsystem_output, formula_string, fbins, device_address,
                      step_stim_length_millis,episode_time_seconds,n_total_timesteps,
                      num_episodes,logfn,
                      logging_plotting_opts,
                      log_or_plot_every_n_timesteps, algorithm, n_steps_per_timestep, obs_space_opts,
                      signal_plot_width, signal_plot_height,training_plot_width,training_plot_height, render_data,
-                     stim_length_on_reset, data_proc_options):
+                     stim_length_on_reset, data_proc_options,
+                     use_unfiltered_np_data):
     ffminf=1000/ffminf #delay = 1000 ms/ n flashes per second
     ffmaxf=1000/ffmaxf
     ffinitf=1000/ffinitf
@@ -1300,14 +1310,19 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
     else:
         only_pos_encoder_mode=False
     session_settings_dict['only_pos_encoder_mode']=only_pos_encoder_mode
+    if len(use_unfiltered_np_data)>0:
+        use_unfiltered_np_data=True
+    else:
+        use_unfiltered_np_data=False
 
 
-    session_settings_dict['n_input_channels']=n_input_channels
-    session_settings_dict['channels_of_interest_inds']=list(map(int, channels_of_interest_inds.split(',')))
+    session_settings_dict['n_input_channels']=17
+    session_settings_dict['channels_of_interest']=channels_of_interest.split(',')
     session_settings_dict['n_timepoints_per_sample']=n_timepoints_per_sample
     session_settings_dict['delay']=delay
     session_settings_dict['max_sfsystem_output']=max_sfsystem_output
     session_settings_dict['reward_formula_string']=formula_string
+    session_settings_dict['use_unfiltered_np_data']=use_unfiltered_np_data
     binlist=fbins.split(';')
     fbins=[]
     for b in binlist:
