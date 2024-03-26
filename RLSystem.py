@@ -96,7 +96,6 @@ channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',6:'np_C4',7:'np_
               9:'sf_ch1',10:'sf_ch2',11:'sf_ch3',12:'sf_ch4',13:'sf_ch5',14:'sf_ch6',15:'sf_ch7',16:'sf_ch8',17:'sf_enc'}
 
 
-
 class SFSystemCommunicator(gym.Env):
     def __init__(self, out_dict=out_dict, out_order=out_order,input_channels=['np_O1','np_P3','np_C3','np_F3','np_F4','np_C4','np_P4','np_O2','sf_enc'], n_timepoints_per_sample=100, max_sfsystem_output=1023,reward_formula_string='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', 
                  fbins=[(0,1), (1,4), (4,8), (8,12), (12,30)], delay=10,
@@ -122,11 +121,10 @@ class SFSystemCommunicator(gym.Env):
                  edf_rf_annotation=False,
                  edf_rf_annotation_threshold=1):
         
-
+        
         self.current_actions=None
         self.ws_sf=None
         self.ws_neuroplay=None
-
         self.channel_spec=channel_spec
         self.sel_input_channels=input_channels
         self.all_input_channels=list(self.channel_spec.values())
@@ -137,7 +135,9 @@ class SFSystemCommunicator(gym.Env):
                 self.use_neuroplay=True
             if 'sf' in i:
                 self.use_sf=True
-
+        if self.use_neuroplay==True:
+            self.start_neuroplay()
+            time.sleep(10)
         self.use_unfiltered_np_data=use_unfiltered_np_data
  
     
@@ -271,6 +271,13 @@ class SFSystemCommunicator(gym.Env):
         self.figures={'signal_fig':[],'training_fig':[]}
         self.colornames=color_names
         self.cur_action_log_no=0
+    def run_neuroplay(self):
+        neuroplay_loc = '/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
+        os.system(f'bash {neuroplay_loc}')
+    def start_neuroplay(self):
+        neuroplay_thread = threading.Thread(target=self.run_neuroplay)
+        neuroplay_thread.daemon = True
+        neuroplay_thread.start()
 
     def start_edf_log(self):
         self.ws_np.send(f'StartRecord?path={self.edfpath}')
@@ -390,6 +397,12 @@ class SFSystemCommunicator(gym.Env):
                     action_space_sample[key1]=val
 
         self.default_actions=action_space_sample
+    def calculate_rms_amplitude(self,  signal):
+        return np.sqrt(np.mean(np.square(signal)))
+    def calculate_max_amplitude(self, signal):
+        return np.max(np.abs(signal))
+    def calculate_peak_to_peak_amplitude(self, signal):
+        return np.ptp(signal)
     def populate_rewarddict(self, observations):
         for token, tokendata in self.tokendict.items():
             tartype=tokendata['datatype']
@@ -400,6 +413,18 @@ class SFSystemCommunicator(gym.Env):
                 if self.use_abs_values_for_raw_data_in_reward==True:
                     tarobs=np.abs(tarobs)
                 res=np.sum(tarobs) #here we use the sum, but this may be changed
+            if tartype=='rmsamp':
+                tarobs=observations['raw_data']
+                tarobs=tarobs[:,tarchannelidx]
+                res=self.calculate_rms_amplitude(tarobs)
+            if tartype=='maxamp':
+                tarobs=observations['raw_data']
+                tarobs=tarobs[:,tarchannelidx]
+                res=self.calculate_max_amplitude(tarobs)
+            if tartype=='ptpamp':
+                tarobs=observations['raw_data']
+                tarobs=tarobs[:,tarchannelidx]
+                res=self.calculate_peak_to_peak_amplitude(tarobs)
             if tartype=='freq':
                 #tarfreq=tokendata['freqdata']
                 taridx=tokendata['closest_fft_ind']
@@ -847,6 +872,9 @@ class SFSystemCommunicator(gym.Env):
                 self.write_tolog(actionstring)
         self.stop_audiovis_feedback() #just in case
         self.ws_sf.send("stop_data_transfer_from_ads") #just in case
+        if self.use_neuroplay:
+            self.ws_np.send("stopSearch")
+            self.ws_np.send("close")
         self.cur_step=0 #just in case
         self.current_episode=0
 
