@@ -97,9 +97,9 @@ channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',6:'np_C4',7:'np_
 
 
 class SFSystemCommunicator(gym.Env):
-    def __init__(self, out_dict=out_dict, out_order=out_order,input_channels=['np_O1','np_P3','np_C3','np_F3','np_F4','np_C4','np_P4','np_O2','sf_enc'], n_timepoints_per_sample=100, max_sfsystem_output=1023,reward_formula_string='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', 
+    def __init__(self, out_dict=out_dict, out_order=out_order,input_channels=['np_O1','np_P3','np_C3','np_F3','np_F4','np_C4','np_P4','np_O2','sf_enc'], n_timepoints_per_sample=500, max_sfsystem_output=1023,reward_formula_string='raw_ch8', 
                  fbins=[(0,1), (1,4), (4,8), (8,12), (12,30)], delay=10,
-                 use_raw_in_os_def=False, use_freq_in_os_def=False, use_fbins_in_os_def=False, device_address="ws://10.42.0.231:80/",
+                 use_raw_in_os_def=True, use_freq_in_os_def=True, use_fbins_in_os_def=True, device_address="ws://10.42.0.231:80/",
                  step_stim_length_millis=10000, episode_time_seconds=60, render_data=True, return_plotly_figs=False,
                  logfn='current_training.log', log_steps=True, log_episodes=True, log_best_actions_final=True, signal_plot_width=2000, signal_plot_height=1500, training_plot_width=2000, training_plot_height=500, 
                  write_raw=True,
@@ -598,6 +598,7 @@ class SFSystemCommunicator(gym.Env):
         return y
     
     def sample_fromsf(self):
+        self.current_sample_sf=None
         self.ws_sf.send("start_data_transfer_from_ads")
         self.current_sample_sf=json.loads(self.ws_sf.recv())
         self.ws_sf.send("stop_data_transfer_from_ads")

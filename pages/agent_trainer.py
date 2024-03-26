@@ -192,7 +192,7 @@ layout=html.Div(
                 'Data types to use in observational space: ',
                 dcc.Dropdown(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Raw signal values','Frequency spectra', 'Frequency bin values'], id='obs_space_opts', multi=True), 
                 html.Br(),      
-                dcc.Checklist(id='use_unfiltered_np_data',options=['Use unfiltered Neuroplay signal'],  value=['Use unfiltered Neuroplay signal']),
+                dcc.Checklist(id='use_unfiltered_np_data',options=['Use unfiltered Neuroplay signal'],  value=[]),
                 html.Br(),           
                 ]
             ),
