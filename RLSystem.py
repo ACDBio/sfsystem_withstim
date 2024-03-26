@@ -495,6 +495,7 @@ class SFSystemCommunicator(gym.Env):
                 self.np_info=json.loads(self.ws_np.recv())
                 self.np_freq=self.np_info['currentFrequency']
                 print(self.np_info)
+                time.sleep(10)
                 print('Neuroplay device data received')
 
         
@@ -830,7 +831,7 @@ class SFSystemCommunicator(gym.Env):
                         color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
                         chfft=self.cur_observations['fft'][chidx]
-                        signal_fig.add_trace(sp.go.Scatter(x=self.f_plot, y=chfft, mode='lines+markers', name=f'Channel {orig_chidx} spectrum', line=dict(color=color)), row=chidx+1, col=1)
+                        signal_fig.add_trace(sp.go.Scatter(x=self.f_plot, y=chfft, mode='lines', name=f'Channel {orig_chidx} spectrum', line=dict(color=color)), row=chidx+1, col=1)
                 if 'current_fbins' in elems and self.record_fbins:
                     for chidx in range(self.n_channels_of_interest):
                         color=colors[chidx]
@@ -842,7 +843,7 @@ class SFSystemCommunicator(gym.Env):
                         color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
                         chraw=self.cur_observations['raw_data'][:,chidx]
-                        signal_fig.add_trace(sp.go.Scatter(x=list(range(len(chraw))), y=chraw, mode='lines+markers', name=f'Channel {orig_chidx} raw signal', line=dict(color=color)), row=chidx+1, col=3)                
+                        signal_fig.add_trace(sp.go.Scatter(x=list(range(len(chraw))), y=chraw, mode='lines', name=f'Channel {orig_chidx} raw signal', line=dict(color=color)), row=chidx+1, col=3)                
                 
                 
                 if self.render_data:

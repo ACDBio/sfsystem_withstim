@@ -56,7 +56,7 @@ def copy_directory(src_dir, dest_dir):
         os.makedirs(dest_dir)
 
     # Copy the directory and all its contents
-    shutil.copytree(src_dir, dest_dir)
+    shutil.copytree(src_dir, dest_dir,  dirs_exist_ok = True)
 
 layout=html.Div(
     [dcc.Store(id='run_type', data=None),
@@ -192,7 +192,7 @@ layout=html.Div(
                 'Data types to use in observational space: ',
                 dcc.Dropdown(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Raw signal values','Frequency spectra', 'Frequency bin values'], id='obs_space_opts', multi=True), 
                 html.Br(),      
-                dcc.Checklist(id='use_unfiltered_np_data',options=['Use unfiltered Neuroplaay signal'],  value=['Use unfiltered Neuroplaay signal']),
+                dcc.Checklist(id='use_unfiltered_np_data',options=['Use unfiltered Neuroplay signal'],  value=['Use unfiltered Neuroplaay signal']),
                 html.Br(),           
                 ]
             ),
@@ -241,7 +241,7 @@ layout=html.Div(
                 dcc.Checklist(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Raw signal values','Frequency spectra', 'Frequency bin values'], id='observational_space_datatypes'),
                 html.Br(),
                 'Frequency bins to record: ',
-                dcc.Input(type='text', placeholder='Bin values, Hz', value='0,1;1,4;4,8;8,12;12,30;30,50', id='fbins'),   
+                dcc.Input(type='text', placeholder='Bin values, Hz', value='1,4;4,8;8,14;14,35;35,50', id='fbins'),   
                 html.Br(),
                 'Device address: ',
                 dcc.Input(type='text', placeholder='Bin values, Hz', value='ws://10.42.0.231:80/', id='device_address'),  
@@ -678,7 +678,7 @@ def copy_session_logs_to_lib(n_clicks, sname):
             copy_file(f'./{f}', session_dir)
         if f==f'{sname}_edf':
             src_dir=os.getcwd()+'/'+f'{sname}_edf'
-            copy_directory(src_dir, session_dir)
+            copy_directory(src_dir, session_dir+'/'+f'{sname}_edf')
     return get_dir_tree('./session_lib')
 
 @callback(Output('session_library', 'data', allow_duplicate=True),
