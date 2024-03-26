@@ -181,7 +181,7 @@ layout=html.Div(
                 dcc.Input(type='text', placeholder='Channels of interest ch0,...chn', value='np_O1,np_P3,np_C3,np_F3,np_F4,np_C4,np_P4,np_O2,sf_enc', id='channels_of_interest', size=100),
                 html.Br(),
                 'N timepoints per sample: ',
-                dcc.Input(type='number', placeholder='N points', value=100, id='n_timepoints_per_sample'),
+                dcc.Input(type='number', placeholder='N points', value=500, id='n_timepoints_per_sample'),
                 html.Br(),               
                 'Delay between datapoints (if Neuroplay is used,   will be set aautomatically to match): ',
                 dcc.Input(type='number', placeholder='Delay, ms', value=10, id='delay'), 
