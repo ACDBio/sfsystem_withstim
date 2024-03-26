@@ -528,7 +528,7 @@ class SFSystemCommunicator(gym.Env):
         magnitudes=[]
         for low, high in self.fbins:
             mask = (fpl >= low) & (fpl < high)
-            magnitude = np.abs(xmp[mask]).mean() #here can be other functions
+            magnitude = np.abs(xmp[mask]).sum() #here can be other functions
             magnitudes.append(magnitude)
         magnitudes=np.array(magnitudes)
         if True in np.isnan(magnitudes):
@@ -596,12 +596,23 @@ class SFSystemCommunicator(gym.Env):
     def synth_data(self, signal_freq=30):
         y=1*np.sin(2*np.pi*signal_freq*self.timesteps)
         return y
+    
+    def sample_fromsf(self):
+        self.ws_sf.send("start_data_transfer_from_ads")
+        self.current_sample_sf=json.loads(self.ws_sf.recv())
+        self.ws_sf.send("stop_data_transfer_from_ads")
+        return True
     def sample_observations(self, use_synth_data=False): #True for testing of fft etc., False - for actual application
         if self.use_sf==True:
-            self.ws_sf.send("start_data_transfer_from_ads")
+            sf_thread = threading.Thread(target=self.sample_fromsf)
+            sf_thread.daemon = True
+            sf_thread.start()
+            sf_thread.join()
+           # self.ws_sf.send("start_data_transfer_from_ads")
         self.raw_data=[]
         # np_unsampled=True
         if self.use_neuroplay==True:
+            print('in_np_sampling')
         #     while np_unsampled:
             try:
                 if self.use_unfiltered_np_data==True:
@@ -620,8 +631,9 @@ class SFSystemCommunicator(gym.Env):
                 self.raw_data.append(i[-self.n_timepoints_per_sample:])   
 
         if self.use_sf==True:
-            self.current_sample_sf=json.loads(self.ws_sf.recv())
-            self.ws_sf.send("stop_data_transfer_from_ads")
+            print('in_sf_sample init processing')
+            # self.current_sample_sf=json.loads(self.ws_sf.recv())
+            # self.ws_sf.send("stop_data_transfer_from_ads")
             for key, value in self.current_sample_sf.items():
                 if use_synth_data==False:
                     if key not in ['enc_is_clicked', "enc_is_holded"]:
@@ -648,6 +660,7 @@ class SFSystemCommunicator(gym.Env):
         self.raw_data=np.array(self.raw_data, dtype=float).transpose()    
         #elf.raw_data_all=self.raw_data
         self.raw_data=self.raw_data[:,self.channels_of_interest_inds]
+        print('sampling done')
         return True
     def sample_and_process_observations_from_device(self):
         self.correct_observations=False
@@ -830,20 +843,23 @@ class SFSystemCommunicator(gym.Env):
                     for chidx in range(self.n_channels_of_interest):
                         color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
+                        chname=self.sel_input_channels[chidx]
                         chfft=self.cur_observations['fft'][chidx]
-                        signal_fig.add_trace(sp.go.Scatter(x=self.f_plot, y=chfft, mode='lines', name=f'Channel {orig_chidx} spectrum', line=dict(color=color)), row=chidx+1, col=1)
+                        signal_fig.add_trace(sp.go.Scatter(x=self.f_plot[1:], y=chfft[1:], mode='lines', name=f'Channel {chname} spectrum', line=dict(color=color)), row=chidx+1, col=1)
                 if 'current_fbins' in elems and self.record_fbins:
                     for chidx in range(self.n_channels_of_interest):
                         color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
+                        chname=self.sel_input_channels[chidx]
                         chbins=self.cur_observations['fbins'][chidx]
-                        signal_fig.add_trace(sp.go.Bar(x=self.fbin_axis_labels, y=chbins, name=f'Channel {orig_chidx} frequency bins', marker=dict(color=color)), row=chidx+1, col=2)
+                        signal_fig.add_trace(sp.go.Bar(x=self.fbin_axis_labels, y=chbins, name=f'Channel {chname} frequency bins', marker=dict(color=color)), row=chidx+1, col=2)
                 if 'current_raw' in elems and self.record_raw:
                     for chidx in range(self.n_channels_of_interest):
                         color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
+                        chname=self.sel_input_channels[chidx]
                         chraw=self.cur_observations['raw_data'][:,chidx]
-                        signal_fig.add_trace(sp.go.Scatter(x=list(range(len(chraw))), y=chraw, mode='lines', name=f'Channel {orig_chidx} raw signal', line=dict(color=color)), row=chidx+1, col=3)                
+                        signal_fig.add_trace(sp.go.Scatter(x=list(range(len(chraw))), y=chraw, mode='lines', name=f'Channel {chname} raw signal', line=dict(color=color)), row=chidx+1, col=3)                
                 
                 
                 if self.render_data:
