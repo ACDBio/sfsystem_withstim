@@ -97,9 +97,9 @@ channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',6:'np_C4',7:'np_
 
 
 class SFSystemCommunicator(gym.Env):
-    def __init__(self, out_dict=out_dict, out_order=out_order,input_channels=['np_O1','np_P3','np_C3','np_F3','np_F4','np_C4','np_P4','np_O2','sf_enc'], n_timepoints_per_sample=500, max_sfsystem_output=1023,reward_formula_string='raw_ch8', 
+    def __init__(self, out_dict=out_dict, out_order=out_order,input_channels=['np_O1','np_P3','np_C3','np_F3','np_F4','np_C4','np_P4','np_O2','sf_enc'], n_timepoints_per_sample=100, max_sfsystem_output=1023,reward_formula_string='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', 
                  fbins=[(0,1), (1,4), (4,8), (8,12), (12,30)], delay=10,
-                 use_raw_in_os_def=True, use_freq_in_os_def=True, use_fbins_in_os_def=True, device_address="ws://10.42.0.231:80/",
+                 use_raw_in_os_def=False, use_freq_in_os_def=False, use_fbins_in_os_def=False, device_address="ws://10.42.0.231:80/",
                  step_stim_length_millis=10000, episode_time_seconds=60, render_data=True, return_plotly_figs=False,
                  logfn='current_training.log', log_steps=True, log_episodes=True, log_best_actions_final=True, signal_plot_width=2000, signal_plot_height=1500, training_plot_width=2000, training_plot_height=500, 
                  write_raw=True,
@@ -484,10 +484,10 @@ class SFSystemCommunicator(gym.Env):
                 while devcount==0:
                     self.ws_np.send('DeviceCount')
                     devcount=json.loads(self.ws_np.recv())["deviceCount"]
-
-
                 self.ws_np.send('startDevice?id=0')
                 print('Neuroplay connected.')
+                print(self.ws_np.recv())
+                self.ws_np.send('StopSearch')
                 print(self.ws_np.recv())
                 self.ws_np.send('EnableDataGrabMode')
                 print(self.ws_np.recv())
@@ -495,8 +495,9 @@ class SFSystemCommunicator(gym.Env):
                 self.np_info=json.loads(self.ws_np.recv())
                 self.np_freq=self.np_info['currentFrequency']
                 print(self.np_info)
-                time.sleep(10)
                 print('Neuroplay device data received')
+        else:
+            self.ws_np=None
 
         
     def set_pos_encoder_mode(self):
@@ -528,7 +529,7 @@ class SFSystemCommunicator(gym.Env):
         magnitudes=[]
         for low, high in self.fbins:
             mask = (fpl >= low) & (fpl < high)
-            magnitude = np.abs(xmp[mask]).sum() #here can be other functions
+            magnitude = np.abs(xmp[mask]).mean() #here can be other functions
             magnitudes.append(magnitude)
         magnitudes=np.array(magnitudes)
         if True in np.isnan(magnitudes):
@@ -603,6 +604,7 @@ class SFSystemCommunicator(gym.Env):
         self.current_sample_sf=json.loads(self.ws_sf.recv())
         self.ws_sf.send("stop_data_transfer_from_ads")
         return True
+    
     def sample_observations(self, use_synth_data=False): #True for testing of fft etc., False - for actual application
         if self.use_sf==True:
             sf_thread = threading.Thread(target=self.sample_fromsf)
@@ -613,7 +615,6 @@ class SFSystemCommunicator(gym.Env):
         self.raw_data=[]
         # np_unsampled=True
         if self.use_neuroplay==True:
-            print('in_np_sampling')
         #     while np_unsampled:
             try:
                 if self.use_unfiltered_np_data==True:
@@ -627,14 +628,14 @@ class SFSystemCommunicator(gym.Env):
                 return False
 
         else:
-            self.current_sample_np==np.zeros(shape=(8,1250))
+            self.current_sample_np=np.zeros(shape=(8,1250))
         for i in self.current_sample_np:
                 self.raw_data.append(i[-self.n_timepoints_per_sample:])   
-
+        print('sampled from np')
         if self.use_sf==True:
-            print('in_sf_sample init processing')
-            # self.current_sample_sf=json.loads(self.ws_sf.recv())
-            # self.ws_sf.send("stop_data_transfer_from_ads")
+            #print("HERE")
+            #self.current_sample_sf=json.loads(self.ws_sf.recv())
+            #self.ws_sf.send("stop_data_transfer_from_ads")
             for key, value in self.current_sample_sf.items():
                 if use_synth_data==False:
                     if key not in ['enc_is_clicked', "enc_is_holded"]:
@@ -643,25 +644,31 @@ class SFSystemCommunicator(gym.Env):
                         if key=='enc_is_clicked':
                             self.enc_is_clicked=value[0]
                             if self.enc_is_clicked==1:
-                                if self.write_edf_ann==True:
-                                    self.write_edf_annotation_fn(ann_text='enc_click',ann_duration_ms=self.delay)
+                                if  self.use_neuroplay==True:
+                                    if self.write_edf_ann==True:
+                                        self.write_edf_annotation_fn(ann_text='enc_click',ann_duration_ms=self.delay)
                         if key=='enc_is_holded':
                             self.enc_is_holded=value[0]
                             if self.enc_is_holded==1:
-                                if self.write_edf_ann==True:
-                                    self.write_edf_annotation_fn(ann_text='enc_holded',ann_duration_ms=self.delay)
+                                if self.use_neuroplay==True:
+                                    if self.write_edf_ann==True:
+                                        self.write_edf_annotation_fn(ann_text='enc_holded',ann_duration_ms=self.delay)
 
                 else:
                     self.raw_data.append(self.synth_data())
+            #print('HERE in sampling')
+            #print(np.array(self.raw_data).shape)
             #self.raw_data_sf=np.array(self.raw_data).transpose()
         else:
-            self.current_sample_sf=np.zeros(shape=(8, self.n_timepoints_per_sample))
+            self.current_sample_sf=np.zeros(shape=(9, self.n_timepoints_per_sample))
             for i in self.current_sample_sf:
                     self.raw_data.append(i)         
-        self.raw_data=np.array(self.raw_data, dtype=float).transpose()    
+        self.raw_data=np.array(self.raw_data, dtype=float).transpose() 
+        print(np.array(self.raw_data).shape)   
         #elf.raw_data_all=self.raw_data
-        self.raw_data=self.raw_data[:,self.channels_of_interest_inds]
-        print('sampling done')
+        #self.raw_data=self.raw_data[:,self.channels_of_interest_inds]
+        print(np.array(self.raw_data).shape)
+        print('sampled from sf')
         return True
     def sample_and_process_observations_from_device(self):
         self.correct_observations=False
@@ -693,10 +700,11 @@ class SFSystemCommunicator(gym.Env):
         #print(action)
         self.current_actions=action
         actionstring=self.get_json_string_from_ordered_dict(action)
-        if self.ws_sf.sock is not None:
-            if self.write_edf_ann==True:
-                if self.edf_step_annotation==True:
-                    self.write_edf_annotation_fn(ann_text=f'episode_{self.current_episode}_step_{self.cur_step}', ann_duration_ms=self.step_stim_length_millis)
+        if self.ws_sf is not None:
+            if self.ws_np is not None:
+                if self.write_edf_ann==True:
+                    if self.edf_step_annotation==True:
+                        self.write_edf_annotation_fn(ann_text=f'episode_{self.current_episode}_step_{self.cur_step}', ann_duration_ms=self.step_stim_length_millis)
 
             self.done=False
             self.best_overall_reward_now=False
@@ -713,17 +721,18 @@ class SFSystemCommunicator(gym.Env):
             reward_val=reward.tolist()
             self.reward_cur=reward
             self.total_cur_episode_reward+=reward_val
-            if self.write_edf_ann==True:
-                if self.edf_step_annotation==True:
-                    anntxt=f'sr_{np.round(reward_val,4)}_tcer_{np.round(self.total_cur_episode_reward,4)}' #f'step_reward_{reward_val}_total_current_episode_reward_{self.total_cur_episode_reward}_action_{actionstring}'
-                    self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
+            if self.ws_np is not None:
+                if self.write_edf_ann==True:
+                    if self.edf_step_annotation==True:
+                        anntxt=f'sr_{np.round(reward_val,4)}_tcer_{np.round(self.total_cur_episode_reward,4)}' #f'step_reward_{reward_val}_total_current_episode_reward_{self.total_cur_episode_reward}_action_{actionstring}'
+                        self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
 
 
-
-            if self.write_edf_ann:
-                if self.edf_rf_annotation:
-                    if reward_val>self.edf_rf_annotation_threshold:
-                        self.write_edf_annotation_fn(ann_text=f'r_{self.reward_formula_string}_t_{self.edf_rf_annotation_threshold}', ann_duration_ms=self.delay)
+            if self.ws_np is not None:
+                if self.write_edf_ann:
+                    if self.edf_rf_annotation:
+                        if reward_val>self.edf_rf_annotation_threshold:
+                            self.write_edf_annotation_fn(ann_text=f'r_{self.reward_formula_string}_t_{self.edf_rf_annotation_threshold}', ann_duration_ms=self.delay)
 
             if reward_val>=self.episode_max_reward:
                     self.episode_max_reward=reward_val
@@ -735,17 +744,19 @@ class SFSystemCommunicator(gym.Env):
                     self.overall_max_reward=reward_val
                     self.best_overall_reward_now=True
                     self.best_action_overall=action
-                    if self.write_edf_ann==True:
-                        anntxt=f'comr_{np.round(reward_val,4)}' #f'current_overall_max_reward_{reward_val}_action_{actionstring}_inprev_{self.step_stim_length}_s'
-                        self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
+                    if self.ws_np is not None:
+                        if self.write_edf_ann==True:
+                            anntxt=f'comr_{np.round(reward_val,4)}' #f'current_overall_max_reward_{reward_val}_action_{actionstring}_inprev_{self.step_stim_length}_s'
+                            self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
 
 
             if self.total_cur_episode_reward>=self.total_episode_max_reward:
                 self.total_episode_max_reward=self.total_cur_episode_reward
                 self.best_total_episode_reward_now=True
-                if self.write_edf_ann==True:
-                    anntxt=f'temr_{np.round(self.total_cur_episode_reward,4)}'#f'current_overall_max_reward_{reward_val}_action_{actionstring}_inprev_{self.step_stim_length}_s'
-                    self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
+                if self.ws_np is not None:
+                    if self.write_edf_ann==True:
+                        anntxt=f'temr_{np.round(self.total_cur_episode_reward,4)}'#f'current_overall_max_reward_{reward_val}_action_{actionstring}_inprev_{self.step_stim_length}_s'
+                        self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
 
 
             if self.collect_data_toplot:
@@ -844,23 +855,20 @@ class SFSystemCommunicator(gym.Env):
                     for chidx in range(self.n_channels_of_interest):
                         color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
-                        chname=self.sel_input_channels[chidx]
                         chfft=self.cur_observations['fft'][chidx]
-                        signal_fig.add_trace(sp.go.Scatter(x=self.f_plot[1:], y=chfft[1:], mode='lines', name=f'Channel {chname} spectrum', line=dict(color=color)), row=chidx+1, col=1)
+                        signal_fig.add_trace(sp.go.Scatter(x=self.f_plot, y=chfft, mode='lines+markers', name=f'Channel {orig_chidx} spectrum', line=dict(color=color)), row=chidx+1, col=1)
                 if 'current_fbins' in elems and self.record_fbins:
                     for chidx in range(self.n_channels_of_interest):
                         color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
-                        chname=self.sel_input_channels[chidx]
                         chbins=self.cur_observations['fbins'][chidx]
-                        signal_fig.add_trace(sp.go.Bar(x=self.fbin_axis_labels, y=chbins, name=f'Channel {chname} frequency bins', marker=dict(color=color)), row=chidx+1, col=2)
+                        signal_fig.add_trace(sp.go.Bar(x=self.fbin_axis_labels, y=chbins, name=f'Channel {orig_chidx} frequency bins', marker=dict(color=color)), row=chidx+1, col=2)
                 if 'current_raw' in elems and self.record_raw:
                     for chidx in range(self.n_channels_of_interest):
                         color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
-                        chname=self.sel_input_channels[chidx]
                         chraw=self.cur_observations['raw_data'][:,chidx]
-                        signal_fig.add_trace(sp.go.Scatter(x=list(range(len(chraw))), y=chraw, mode='lines', name=f'Channel {chname} raw signal', line=dict(color=color)), row=chidx+1, col=3)                
+                        signal_fig.add_trace(sp.go.Scatter(x=list(range(len(chraw))), y=chraw, mode='lines+markers', name=f'Channel {orig_chidx} raw signal', line=dict(color=color)), row=chidx+1, col=3)                
                 
                 
                 if self.render_data:
@@ -906,8 +914,9 @@ class SFSystemCommunicator(gym.Env):
             self.clear_log()
         if self.ws_sf.sock is not None:
             self.ws_sf.close()
-        if self.ws_np is not None:
-            self.ws_np.close()
+        if self.use_neuroplay:
+            if self.ws_np is not None:
+                self.ws_np.close()
         
                
 
