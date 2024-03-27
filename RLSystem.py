@@ -664,26 +664,30 @@ class SFSystemCommunicator(gym.Env):
             for i in self.current_sample_sf:
                     self.raw_data.append(i)         
         self.raw_data=np.array(self.raw_data, dtype=float).transpose() 
-        print(np.array(self.raw_data).shape)   
+        #print(np.array(self.raw_data).shape)   
         #elf.raw_data_all=self.raw_data
         #self.raw_data=self.raw_data[:,self.channels_of_interest_inds]
-        print(np.array(self.raw_data).shape)
+        #print(np.array(self.raw_data).shape)
         print('sampled from sf')
         return True
     def sample_and_process_observations_from_device(self):
         self.correct_observations=False
         new_observations=dict()
+        self.new_observations_tarchs=dict()
         while self.correct_observations==False:
             self.correct_observations=self.sample_observations()
         new_observations['raw_data']=self.raw_data
+        self.new_observations_tarchs['raw_data']=new_observations['raw_data'][:,self.channels_of_interest_inds]
         if self.do_fft:
          self.fft=self.get_fft_allchannels(raw_data=self.raw_data)
          if self.record_fft:
             new_observations['fft']=self.fft
+            self.new_observations_tarchs['fft']=new_observations['fft'][self.channels_of_interest_inds,:]
         if self.do_fbins:
             self.fbins_data=self.get_bin_values_allchannels(fft=self.fft)
             if self.record_fbins:
                 new_observations['fbins']=self.fbins_data 
+                self.new_observations_tarchs['fbins']=new_observations['fbins'][self.channels_of_interest_inds,:]
         new_observations=OrderedDict(new_observations)
         return new_observations
     def write_signal_logs(self):
@@ -786,7 +790,7 @@ class SFSystemCommunicator(gym.Env):
                 #print(self.current_sample)
                 if self.enc_is_holded:
                     self.log_actions()
-            return new_observations, reward, self.done, {} #False
+            return self.new_observations_tarchs, reward, self.done, {} #False
         else:
             print('No connection')
             return
@@ -822,7 +826,7 @@ class SFSystemCommunicator(gym.Env):
         time.sleep(self.stim_length_on_reset) #prepare the brain for the next episode 
         new_observations=self.sample_and_process_observations_from_device() #sampling new observations after reset
         self.cur_observations=new_observations
-        return new_observations, {}
+        return self.new_observations_tarchs, {}
 
     def get_json_string_from_ordered_dict(self, od):
         od=dict(od)
@@ -1191,7 +1195,8 @@ class stable_baselines_model_trainer():
             
             self.env.stop_audiovis_feedback()
             self.training_completed=True 
-            self.env.pause_edf_log()   
+            if self.env.use_neuroplay==True:
+                self.env.pause_edf_log()   
             return     
         else:
             print('No connection.')

@@ -14,6 +14,7 @@
 #include <string>
 #include "AudioTools.h"
 #include "AudioLibs/MaximilianDSP.h"
+#include "esp_task_wdt.h"
 //wave_freq - ch1, wave_freq - ch2, panner_freq, panner_div, phasor1_freq, phasor1min, phasor1_max, phasor2_freq, phasor2min, phasor2_max
 
 
@@ -65,6 +66,7 @@ vector<float> myStereoOutput1(2,0);
 vector<float> myStereoOutput2(2,0);
 maxiMix myOutputs;//this is the stereo mixer channel.
 maxiOsc myPhasor1, myPhasor2, noise, myOsc3, myOsc4;
+SemaphoreHandle_t adsSemaphore = xSemaphoreCreateBinary();
 
 int wave_1_freq;
 int wave_2_freq;
@@ -257,7 +259,7 @@ void hexdump(const void *mem, uint32_t len, uint8_t cols = 16) {
 	Serial.printf("\n");
 }
 
-bool data_transfer;
+volatile bool data_transfer = false;
 int n_datapoints;
 bool set_data_transfer_buffer;
 uint8_t delay_length;
@@ -269,12 +271,19 @@ bool run_led_cycle;
 int leddelay;
 bool use_leddelay;
 bool only_pos_enc_mode;
+int enc_is_click = 0;
+int enc_is_holded =  0;
+int sample_count = 0; // variable to keep track of the number of samples taken
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
   clientID = num;
     switch(type) {
         case WStype_DISCONNECTED:
             Serial.printf("[%u] Disconnected!\n", num);
+            sample_count = 0;
+            enc_is_click = 0;
+            enc_is_holded =  0;
+            data_transfer=false; //this is for the case when a signle sample is sent
             break;
         case WStype_CONNECTED:
             {
@@ -288,6 +297,10 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 only_pos_enc_mode = false;
 				// send message to client
 				webSocket.sendTXT(num, "Connected");
+        sample_count = 0;
+        enc_is_click = 0;
+        enc_is_holded =  0;
+        data_transfer=false; //this is for the case when a signle sample is sent
             }
             break;
         case WStype_TEXT:
@@ -476,8 +489,12 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 //WIFI functions - end
 void maximilianCopyTask(void *pvParameters) {
     for (;;) {
+      // if (xSemaphoreTake(adsSemaphore, portMAX_DELAY) == pdTRUE) {
         maximilian.copy();
-    }
+      //  taskYIELD();
+       //  xSemaphoreGive(adsSemaphore);
+      // }
+     }
 }
 
 
@@ -500,11 +517,44 @@ void run_ledloop(){
 }
 void ledloopRunTask(void *pvParameters) {
     for (;;) {
+        // if (xSemaphoreTake(adsSemaphore, portMAX_DELAY) == pdTRUE) {
         run_ledloop();
+        //taskYIELD();
+        // xSemaphoreGive(adsSemaphore); 
+        // }
+     }
+}
+
+void adsSamplingTask(void *pvParameters) {
+    // esp_err_t err = esp_task_wdt_deinit();
+    // if (err != ESP_OK) {
+    //     // Handle the error if the WDT could not be deinitialized
+    //     Serial.printf("Failed to deinitialize WDT: %d\n", err);
+    // }
+    for (;;) {
+        if (data_transfer) {
+            // Perform ADS1256 sampling
+            ads.readInputToAdcValuesArray();
+            // ... (rest of the sampling code)
+
+            // After sampling, you can reset data_transfer to false
+            // if you want the task to pause until it's set to true again
+            //data_transfer = false;
+        } else {
+            // If data_transfer is false, pause the task for a certain period
+            // or until data_transfer becomes true again
+            vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+        }
+      //  taskYIELD();
     }
 }
 
 void setup() {
+    esp_err_t err = esp_task_wdt_init(120, false); // 120 seconds timeout, reset on timeout
+    if (err != ESP_OK) {
+        // Handle the error if the WDT could not be initialized
+        Serial.printf("Failed to initialize WDT: %d\n", err);
+    }
   Wire.setPins(SDA, SCL);
   Wire.begin();
   Serial.begin(115200); 
@@ -620,6 +670,15 @@ xTaskCreatePinnedToCore(
         "ledloopRunTask", /* Name of the task */
         5000,                /* Stack size in words */
         NULL,                /* Task input parameter */
+        5,                   /* Priority of the task */
+        NULL, /* Task handle */
+        0                    /* Core where the task should run */
+    );
+xTaskCreatePinnedToCore(
+        adsSamplingTask,   /* Function to implement the task */
+        "adsSamplingTask", /* Name of the task */
+        10000,                /* Stack size in words */
+        NULL,                /* Task input parameter */
         1,                   /* Priority of the task */
         NULL, /* Task handle */
         0                    /* Core where the task should run */
@@ -637,7 +696,6 @@ int ch6_vals[MAX_SAMPLES];
 int ch7_vals[MAX_SAMPLES];
 int ch8_vals[MAX_SAMPLES];
 int ch9_vals[MAX_SAMPLES]; //encoder
-int sample_count = 0; // variable to keep track of the number of samples taken
 
 
 
@@ -645,8 +703,6 @@ int sample_count = 0; // variable to keep track of the number of samples taken
 int enc_val_n = 0;
 //int enc_val_diff = 0;
 int enc_cum_val_whilenodtransfer=0;
-int enc_is_click = 0;
-int enc_is_holded =  0;
 void loop() {
   enc.tick();
   //Serial.println(444);
@@ -667,7 +723,10 @@ void loop() {
 
   webSocket.loop();
   if (data_transfer && sample_count < n_datapoints) {
+
+    //xSemaphoreGive(adsSemaphore);
     enc.tick();
+    Serial.println(sample_count);
     if (enc.isRight()) enc_val_n++;     
     if (enc.isRightH()) enc_val_n += 5;  
     if (only_pos_enc_mode){
@@ -680,15 +739,20 @@ void loop() {
 
     if (enc.isClick()) enc_is_click = 1;
     if (enc.isHolded()) enc_is_holded = 1;
-    // Serial.println(111);
-    //Serial.println(enc_val_n);
-    // Serial.println(222);
-    // Serial.println(enc_val_prev);
-    //enc_val_diff=enc_val_n-enc_val_prev;
-    ads.readInputToAdcValuesArray();
-    // Serial.println(ads.adcValues[ 0 ]);
-    // Serial.print( "      " );
-    // Serial.println();
+
+    // xSemaphoreGive(adsSemaphore);
+    // ads.readInputToAdcValuesArray();
+    // xSemaphoreGive(adsSemaphore);
+    // int ch1_val=0;
+    // int ch2_val=0;
+    // int ch3_val=0;
+    // int ch4_val=0;
+    // int ch5_val=0;
+    // int ch6_val=0;
+    // int ch7_val=0;
+    // int ch8_val=0;
+    
+
     int ch1_val=ads.adcValues[ 0 ];
     int ch2_val=ads.adcValues[ 1 ];
     int ch3_val=ads.adcValues[ 2 ];
@@ -798,6 +862,8 @@ void loop() {
       sample_count = 0;
       enc_is_click = 0;
       enc_is_holded =  0;
+      data_transfer=false; //this is for the case when a signle sample is sent
+    //  xSemaphoreGive(adsSemaphore);
     }
   }
 }
