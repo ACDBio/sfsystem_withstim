@@ -202,7 +202,7 @@ layout=html.Div(
                 dcc.Markdown('Data processing and usage settings'),  
                 html.Hr(),              
                 'Reward formula: ',
-                dcc.Input(type='text', placeholder='Formula string', value='raw_ch8', id='formula_string', size='50'),  
+                dcc.Input(type='text', placeholder='Formula string', value='raw_ch16', id='formula_string', size='50'),  
                 ' ',
                 dbc.Button("Help", id="open_formula_instructions", n_clicks=0),    
                 html.Br(),
