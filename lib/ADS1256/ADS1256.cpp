@@ -68,7 +68,7 @@ void ADS1256::init( uint8_t _pinCS, uint8_t _pinRDY, uint8_t _pinRESET, uint32_t
 	This bit duplicates the state of the DRDY pin.
 	**************************************************************************************************************/
 	byte status_reg = 0x00;  // address (datasheet p. 30)
-	byte status_data = 0x01; // 01h = 0000 0 0 0 1 => status: Most Significant Bit First, Auto-Calibration Disabled, Analog Input Buffer Disabled
+	byte status_data = 0x01; //status_data 0x01-previous setup 01h = 0000 0 0 0 1 => status: Most Significant Bit First, Auto-Calibration Disabled, Analog Input Buffer Disabled
 							 //byte status_data = 0x07; // 01h = 0000 0 1 1 1 => status: Most Significant Bit First, Auto-Calibration Enabled, Analog Input Buffer Enabled
 	SPI.transfer( 0x50 | status_reg );
 	SPI.transfer( 0x00 );   // 2nd command byte, write one register only
@@ -108,7 +108,7 @@ void ADS1256::init( uint8_t _pinCS, uint8_t _pinRDY, uint8_t _pinRESET, uint32_t
 	**********************************************************************************************************************/
 	byte adcon_reg = 0x02; //A/D Control Register (Address 02h)
 						   //byte adcon_data = 0x20; // 0 01 00 000 => Clock Out Frequency = fCLKIN, Sensor Detect OFF, gain 1
-	byte adcon_data = 0x01; //Default was: 0x00; // 0 00 00 000 => Clock Out = Off, Sensor Detect OFF, gain 1
+	byte adcon_data = 0x00; //0x01 - previous setting, Default was: 0x00; // 0 00 00 000 => Clock Out = Off, Sensor Detect OFF, gain 1
 							//byte adcon_data = 0x01;   // 0 00 00 001 => Clock Out = Off, Sensor Detect OFF, gain 2
 	SPI.transfer( 0x50 | adcon_reg );  // 52h = 0101 0010
 	SPI.transfer( 0x00 );              // 2nd command byte, write one register only
