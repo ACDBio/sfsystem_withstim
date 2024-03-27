@@ -529,7 +529,7 @@ class SFSystemCommunicator(gym.Env):
         magnitudes=[]
         for low, high in self.fbins:
             mask = (fpl >= low) & (fpl < high)
-            magnitude = np.abs(xmp[mask]).mean() #here can be other functions
+            magnitude = np.abs(xmp[mask]).sum() #here can be other functions
             magnitudes.append(magnitude)
         magnitudes=np.array(magnitudes)
         if True in np.isnan(magnitudes):
@@ -859,20 +859,23 @@ class SFSystemCommunicator(gym.Env):
                     for chidx in range(self.n_channels_of_interest):
                         color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
+                        chname=self.sel_input_channels[chidx]
                         chfft=self.cur_observations['fft'][chidx]
-                        signal_fig.add_trace(sp.go.Scatter(x=self.f_plot, y=chfft, mode='lines+markers', name=f'Channel {orig_chidx} spectrum', line=dict(color=color)), row=chidx+1, col=1)
+                        signal_fig.add_trace(sp.go.Scatter(x=self.f_plot[1:], y=chfft[1:], mode='lines', name=f'Channel {chname} spectrum', line=dict(color=color)), row=chidx+1, col=1)
                 if 'current_fbins' in elems and self.record_fbins:
                     for chidx in range(self.n_channels_of_interest):
                         color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
+                        chname=self.sel_input_channels[chidx]
                         chbins=self.cur_observations['fbins'][chidx]
-                        signal_fig.add_trace(sp.go.Bar(x=self.fbin_axis_labels, y=chbins, name=f'Channel {orig_chidx} frequency bins', marker=dict(color=color)), row=chidx+1, col=2)
+                        signal_fig.add_trace(sp.go.Bar(x=self.fbin_axis_labels, y=chbins, name=f'Channel {chname} frequency bins', marker=dict(color=color)), row=chidx+1, col=2)
                 if 'current_raw' in elems and self.record_raw:
                     for chidx in range(self.n_channels_of_interest):
                         color=colors[chidx]
                         orig_chidx=self.channels_of_interest_inds[chidx]
+                        chname=self.sel_input_channels[chidx]
                         chraw=self.cur_observations['raw_data'][:,chidx]
-                        signal_fig.add_trace(sp.go.Scatter(x=list(range(len(chraw))), y=chraw, mode='lines+markers', name=f'Channel {orig_chidx} raw signal', line=dict(color=color)), row=chidx+1, col=3)                
+                        signal_fig.add_trace(sp.go.Scatter(x=list(range(len(chraw))), y=chraw, mode='lines', name=f'Channel {chname} raw signal', line=dict(color=color)), row=chidx+1, col=3)                
                 
                 
                 if self.render_data:
