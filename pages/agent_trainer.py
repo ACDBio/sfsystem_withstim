@@ -41,6 +41,57 @@ offcanvas_session_lib = html.Div(
     ]
 )
 
+offcanvas_channel_specification = html.Div(
+    [
+        dbc.Button(
+            "Show channel index map",
+            id="open_channel_map",
+            n_clicks=0,
+        ),
+        dbc.Offcanvas(
+            #html.P(""),
+            children=[
+                '0: np_O1',
+                html.Br(),
+                '1: np_P3',
+                html.Br(),
+                '2: np_C3',
+                html.Br(),
+                '3: np_F3',
+                html.Br(),
+                '4: np_F4',
+                html.Br(),
+                '5: np_C4',
+                html.Br(),
+                '6: np_P4',
+                html.Br(),
+                '7: np_O2',
+                html.Br(),
+                '8: sf_ch1',
+                html.Br(),
+                '9: sf_ch2',
+                html.Br(),
+                '10: sf_ch3',
+                html.Br(),
+                '11: sf_ch4',
+                html.Br(),
+                '12: sf_ch5',
+                html.Br(),
+                '13: sf_ch6',
+                html.Br(),
+                '14: sf_ch7',
+                html.Br(),
+                '15: sf_ch8',
+                html.Br(),
+                '16: sf_enc'],
+            id="offcanvas_channel_map",
+            scrollable=True,
+            title="Channel map",
+            is_open=False,
+        ),
+    ]
+)
+
 def get_dir_tree(dirloc):
     results=[]
     for dirpath, dirnames, filenames in os.walk(dirloc):
@@ -206,6 +257,7 @@ layout=html.Div(
                 ' ',
                 dbc.Button("Help", id="open_formula_instructions", n_clicks=0),    
                 html.Br(),
+                offcanvas_channel_specification,
                 dcc.Checklist(options=['Use absolute raw values in reward calculation',
                                        'Use directionality-agnostic encoder mode'], value=['Use directionality-agnostic encoder mode'], id='data_proc_options'),
                 dbc.Offcanvas(children=[
@@ -585,6 +637,16 @@ def toggle_offcanvas_scrollable(n1, is_open):
     Output('plot_panel', "is_open"),
     Input("open_plot_panel", "n_clicks"),
     State('plot_panel', "is_open"),
+)
+def toggle_offcanvas_scrollable(n1, is_open):
+    if n1:
+        return not is_open
+    return is_open
+
+@callback(
+    Output("offcanvas_channel_map", "is_open"),
+    Input("open_channel_map", "n_clicks"),
+    State("offcanvas_channel_map", "is_open"),
 )
 def toggle_offcanvas_scrollable(n1, is_open):
     if n1:
