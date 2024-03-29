@@ -97,7 +97,17 @@ channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',6:'np_C4',7:'np_
 
 
 class SFSystemCommunicator(gym.Env):
-    def __init__(self, out_dict=out_dict, out_order=out_order,input_channels=['np_O1','np_P3','np_C3','np_F3','np_F4','np_C4','np_P4','np_O2','sf_enc'], n_timepoints_per_sample=100, max_sfsystem_output=1023,reward_formula_string='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', 
+    def __init__(self, out_dict=out_dict, out_order=out_order,input_channels=['np_O1','np_P3','np_C3','np_F3','np_F4','np_C4','np_P4','np_O2','sf_enc'], 
+                 n_timepoints_per_sample=100, 
+
+                 max_sfsystem_output=9000000, #for 24 bit ADS
+                 min_sfsystem_output=-9000000,
+                 max_fft_output=10000000,
+                 min_fft_output=0,
+                 max_bin_output=100000000,
+                 min_bin_output=0,
+
+                 reward_formula_string='(fbin_1_4_ch0+freq_30_ch0)/fbin_12_30_ch0', 
                  fbins=[(0,1), (1,4), (4,8), (8,12), (12,30)], delay=10,
                  use_raw_in_os_def=False, use_freq_in_os_def=False, use_fbins_in_os_def=False, device_address="ws://10.42.0.231:80/",
                  step_stim_length_millis=10000, episode_time_seconds=60, render_data=True, return_plotly_figs=False,
@@ -174,7 +184,16 @@ class SFSystemCommunicator(gym.Env):
         
         self.out_dict=out_dict
         self.out_order=out_order
+
         self.max_sfsystem_output=max_sfsystem_output
+        self.min_sfsystem_output=min_sfsystem_output
+        self.max_fft_output=max_fft_output
+        self.min_fft_output=min_fft_output
+        self.max_bin_output=max_bin_output
+        self.min_bin_output=min_bin_output
+
+
+
         self.n_timepoints_per_sample=n_timepoints_per_sample
         self.n_input_channels=len(self.sel_input_channels)
         self.reward_formula_string=reward_formula_string
@@ -450,11 +469,11 @@ class SFSystemCommunicator(gym.Env):
                 self.action_space.spaces[spacename]=spaces.Box(low=spacesrange['min'], high=spacesrange['max'], shape=(1,), dtype=int)
     def init_observation_space(self):
         self.observation_space=spaces.Dict({})
-        self.observation_space['raw_data']=spaces.Box(low=0, high=self.max_sfsystem_output, shape=(self.n_timepoints_per_sample, self.n_channels_of_interest), dtype=int) #n timepoints per sample rows, n input channels columns, signals should be normalized
+        self.observation_space['raw_data']=spaces.Box(low=self.min_sfsystem_output, high=self.max_sfsystem_output, shape=(self.n_timepoints_per_sample, self.n_channels_of_interest), dtype=int) #n timepoints per sample rows, n input channels columns, signals should be normalized
         if self.record_fft:
-            self.observation_space['fft']=spaces.Box(low=0.0, high=1.0, shape=(self.n_channels_of_interest, self.n_fft_values))
+            self.observation_space['fft']=spaces.Box(low=self.min_fft_output, high=self.max_fft_output, shape=(self.n_channels_of_interest, self.n_fft_values))
         if self.record_fbins:
-            self.observation_space['fbins']=spaces.Box(low=0.0, high=1.0, shape=(self.n_channels_of_interest, self.n_fbins))
+            self.observation_space['fbins']=spaces.Box(low=self.min_bin_output, high=self.max_bin_output, shape=(self.n_channels_of_interest, self.n_fbins))
     def set_fft_params(self):
         self.sampling_frequency=int(1000/self.delay)
         self.max_possible_fft_frequency=self.sampling_frequency/2
