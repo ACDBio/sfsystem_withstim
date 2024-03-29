@@ -565,15 +565,15 @@ def toggle_offcanvas_scrollable(n_clicks_st, n_clicks_cd, text, text_size):
     if 'env' in globals():
         global env
         if trigger_id=="send_display_text":
-            env.ws.send(msg)
+            env.ws_sf.send(msg)
         else:
-            env.ws.send("turn_off_display")
+            env.ws_sf.send("turn_off_display")
     else:
         env = SFSystemCommunicator()
         if trigger_id=="send_display_text":
-            env.ws.send(msg)
+            env.ws_sf.send(msg)
         else:
-            env.ws.send("turn_off_display")
+            env.ws_sf.send("turn_off_display")
         
 
 @callback(
