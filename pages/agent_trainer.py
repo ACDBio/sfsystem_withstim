@@ -506,6 +506,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 'Text size: ',
                 dcc.Input(type='number', placeholder='1,2,3 etc.', value=2, id='text_size'),  
                 html.Br(),
+                dcc.Checklist(options=['Send reward to display'], value=['Send reward to display'], id='send_reward_to_display'),
                 html.Button("Send to display", id="send_display_text", style=b_vis, n_clicks=0),
                 html.Button("Clear display (if anything present)", id="clear_display", style=b_vis, n_clicks=0),                 
                 dcc.Checklist(options=['Pause or restart signal on encoder click'], value=['Pause or restart signal on encoder click'], id='pause_on_click'),
@@ -911,6 +912,8 @@ def get_state_from_model_logfile(logfile=None):
           State('edf_rf_annotation','value'),
           State('edf_rf_annotation_threshold','value'),
           State('session_name','value'),
+          State('send_reward_to_display', 'value'),
+          State('text_size','value'),
 
 
           prevent_initial_call=True)
@@ -931,10 +934,16 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                     edf_step_annotation,
                     edf_rf_annotation,
                     edf_rf_annotation_threshold,
-                    session_name):
+                    session_name,
+                    send_reward_to_display,
+                    text_size):
     
 
     edf_ann_fn=session_name+'_edf'
+    if len(send_reward_to_display)>0:
+        send_reward_to_display=True
+    else:
+        send_reward_to_display=False
     if len(edf_rf_annotation)>0:
         edf_rf_annotation=True
     else:
@@ -1015,7 +1024,9 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 edf_rf_annotation_threshold=edf_rf_annotation_threshold,
                                                 edf_step_annotation=edf_step_annotation,
                                                 write_edf_ann=write_edf_ann,
-                                                edf_ann_fn=edf_ann_fn)
+                                                edf_ann_fn=edf_ann_fn,
+                                                send_reward_to_display=send_reward_to_display,
+                                                text_size=text_size)
         time.sleep(5)    
 
                 #print(sd)
@@ -1139,7 +1150,9 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                             edf_rf_annotation_threshold=edf_rf_annotation_threshold,
                                             edf_step_annotation=edf_step_annotation,
                                             write_edf_ann=write_edf_ann,
-                                            edf_ann_fn=edf_ann_fn)    
+                                            edf_ann_fn=edf_ann_fn,
+                                            send_reward_to_display=send_reward_to_display,
+                                            text_size=text_size)    
         time.sleep(5) 
         trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                             algorithm=sd['algorithm'],

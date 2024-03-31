@@ -129,8 +129,13 @@ class SFSystemCommunicator(gym.Env):
                  edf_ann_fn='default_edf',
                  edf_step_annotation=False,
                  edf_rf_annotation=False,
-                 edf_rf_annotation_threshold=1):
+                 edf_rf_annotation_threshold=1,
+                 send_reward_to_display=False,
+                 text_size=1
+                 ):
         
+        self.send_reward_to_display=send_reward_to_display
+        self.text_size=text_size
         
         self.current_actions=None
         self.ws_sf=None
@@ -809,6 +814,9 @@ class SFSystemCommunicator(gym.Env):
                 #print(self.current_sample)
                 if self.enc_is_holded:
                     self.log_actions()
+            if self.send_reward_to_display:
+                msg='display_text:'+str(self.text_size)+':'+str(reward)
+                self.ws_sf.send(msg)
             return self.new_observations_tarchs, reward, self.done, {} #False
         else:
             print('No connection')
