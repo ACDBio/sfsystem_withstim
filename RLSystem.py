@@ -136,7 +136,7 @@ class SFSystemCommunicator(gym.Env):
         
         self.send_reward_to_display=send_reward_to_display
         self.text_size=text_size
-        
+
         self.current_actions=None
         self.ws_sf=None
         self.ws_neuroplay=None
@@ -925,6 +925,7 @@ class SFSystemCommunicator(gym.Env):
         self.best_overall_reward_now=False
         self.best_total_episode_reward_now=False
     def close(self, clear_log=False):
+        self.ws_sf.send("turn_off_display")
         if self.log_best_actions_final:
             if str(self.best_action_overall) != 'None':
                 actionstring=self.get_json_string_from_ordered_dict(self.best_action_overall)
