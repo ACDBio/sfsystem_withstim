@@ -96,6 +96,13 @@ channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',6:'np_C4',7:'np_
               9:'sf_ch1',10:'sf_ch2',11:'sf_ch3',12:'sf_ch4',13:'sf_ch5',14:'sf_ch6',15:'sf_ch7',16:'sf_ch8',17:'sf_enc'}
 
 
+
+class CustomExceptionWithDetails(Exception):
+    """A custom exception class with additional details."""
+    def __init__(self, message, detail):
+        super().__init__(message)
+        self.detail = detail
+
 class SFSystemCommunicator(gym.Env):
     def __init__(self, out_dict=out_dict, out_order=out_order,input_channels=['np_O1','np_P3','np_C3','np_F3','np_F4','np_C4','np_P4','np_O2','sf_enc'], 
                  n_timepoints_per_sample=100, 
@@ -623,11 +630,21 @@ class SFSystemCommunicator(gym.Env):
         return y
     
     def sample_fromsf(self):
-        self.current_sample_sf=None
-        self.ws_sf.send("start_data_transfer_from_ads")
-        self.current_sample_sf=json.loads(self.ws_sf.recv())
-        self.ws_sf.send("stop_data_transfer_from_ads")
-        return True
+        #try:
+        if self.ws_sf.connected:
+            self.current_sample_sf=None
+            self.ws_sf.send("start_data_transfer_from_ads")
+            self.current_sample_sf=json.loads(self.ws_sf.recv())
+            self.ws_sf.send("stop_data_transfer_from_ads")
+            return True
+        else:
+            print('No connection')
+            return True
+            self.close()
+                #raise CustomExceptionWithDetails("Unable to sample", "No connection")
+                
+        #except:
+            #raise CustomExceptionWithDetails("Unable to sample", "")
     
     def sample_observations(self, use_synth_data=False): #True for testing of fft etc., False - for actual application
         if self.use_sf==True:
@@ -698,8 +715,11 @@ class SFSystemCommunicator(gym.Env):
         self.correct_observations=False
         new_observations=dict()
         self.new_observations_tarchs=dict()
-        while self.correct_observations==False:
-            self.correct_observations=self.sample_observations()
+        #while self.correct_observations==False:
+        #    try:
+        self.correct_observations=self.sample_observations()
+        #    except:
+        #        raise ConnectionAbortedError
         new_observations['raw_data']=self.raw_data
         self.new_observations_tarchs['raw_data']=new_observations['raw_data'][:,self.channels_of_interest_inds]
         if self.do_fft:
@@ -726,101 +746,105 @@ class SFSystemCommunicator(gym.Env):
                 self.write_tolog(json.dumps({'raw_data':self.cur_observations['raw_data'].tolist()}))
     def step(self, action):
         #print(action)
-        self.current_actions=action
-        actionstring=self.get_json_string_from_ordered_dict(action)
-        if self.ws_sf is not None:
-            if self.ws_np is not None:
-                if self.write_edf_ann==True:
-                    if self.edf_step_annotation==True:
-                        self.write_edf_annotation_fn(ann_text=f'episode_{self.current_episode}_step_{self.cur_step}', ann_duration_ms=self.step_stim_length_millis)
+        try:
+            self.current_actions=action
+            actionstring=self.get_json_string_from_ordered_dict(action)
+            if self.ws_sf is not None:
+                if self.ws_np is not None:
+                    if self.write_edf_ann==True:
+                        if self.edf_step_annotation==True:
+                            self.write_edf_annotation_fn(ann_text=f'episode_{self.current_episode}_step_{self.cur_step}', ann_duration_ms=self.step_stim_length_millis)
 
-            self.done=False
-            self.best_overall_reward_now=False
-            self.best_episode_reward_now=False
-            self.best_total_episode_reward_now=False
-
-
-            self.update_audiovis_feedback(update_dict=action)
-            time.sleep(self.step_stim_length)
-            
-            new_observations=self.sample_and_process_observations_from_device()
-            self.cur_observations=new_observations
-            reward=self.get_reward(observations=new_observations, toreturn=True)
-            reward_val=reward.tolist()
-            self.reward_cur=reward
-            self.total_cur_episode_reward+=reward_val
-            if self.ws_np is not None:
-                if self.write_edf_ann==True:
-                    if self.edf_step_annotation==True:
-                        anntxt=f'sr_{np.round(reward_val,4)}_tcer_{np.round(self.total_cur_episode_reward,4)}' #f'step_reward_{reward_val}_total_current_episode_reward_{self.total_cur_episode_reward}_action_{actionstring}'
-                        self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
+                self.done=False
+                self.best_overall_reward_now=False
+                self.best_episode_reward_now=False
+                self.best_total_episode_reward_now=False
 
 
-            if self.ws_np is not None:
-                if self.write_edf_ann:
-                    if self.edf_rf_annotation:
-                        if reward_val>self.edf_rf_annotation_threshold:
-                            self.write_edf_annotation_fn(ann_text=f'r_{self.reward_formula_string}_t_{self.edf_rf_annotation_threshold}', ann_duration_ms=self.delay)
-
-            if reward_val>=self.episode_max_reward:
-                    self.episode_max_reward=reward_val
-                    self.best_episode_reward_now=True
-                    self.best_action_episode=action
-
-            if reward_val>=self.overall_max_reward:
-                    #print('setting best overall reward')
-                    self.overall_max_reward=reward_val
-                    self.best_overall_reward_now=True
-                    self.best_action_overall=action
-                    if self.ws_np is not None:
-                        if self.write_edf_ann==True:
-                            anntxt=f'comr_{np.round(reward_val,4)}' #f'current_overall_max_reward_{reward_val}_action_{actionstring}_inprev_{self.step_stim_length}_s'
+                self.update_audiovis_feedback(update_dict=action)
+                time.sleep(self.step_stim_length)
+                
+                new_observations=self.sample_and_process_observations_from_device()
+                self.cur_observations=new_observations
+                reward=self.get_reward(observations=new_observations, toreturn=True)
+                reward_val=reward.tolist()
+                self.reward_cur=reward
+                self.total_cur_episode_reward+=reward_val
+                if self.ws_np is not None:
+                    if self.write_edf_ann==True:
+                        if self.edf_step_annotation==True:
+                            anntxt=f'sr_{np.round(reward_val,4)}_tcer_{np.round(self.total_cur_episode_reward,4)}' #f'step_reward_{reward_val}_total_current_episode_reward_{self.total_cur_episode_reward}_action_{actionstring}'
                             self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
 
 
-            if self.total_cur_episode_reward>=self.total_episode_max_reward:
-                self.total_episode_max_reward=self.total_cur_episode_reward
-                self.best_total_episode_reward_now=True
                 if self.ws_np is not None:
-                    if self.write_edf_ann==True:
-                        anntxt=f'temr_{np.round(self.total_cur_episode_reward,4)}'#f'current_overall_max_reward_{reward_val}_action_{actionstring}_inprev_{self.step_stim_length}_s'
-                        self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
+                    if self.write_edf_ann:
+                        if self.edf_rf_annotation:
+                            if reward_val>self.edf_rf_annotation_threshold:
+                                self.write_edf_annotation_fn(ann_text=f'r_{self.reward_formula_string}_t_{self.edf_rf_annotation_threshold}', ann_duration_ms=self.delay)
+
+                if reward_val>=self.episode_max_reward:
+                        self.episode_max_reward=reward_val
+                        self.best_episode_reward_now=True
+                        self.best_action_episode=action
+
+                if reward_val>=self.overall_max_reward:
+                        #print('setting best overall reward')
+                        self.overall_max_reward=reward_val
+                        self.best_overall_reward_now=True
+                        self.best_action_overall=action
+                        if self.ws_np is not None:
+                            if self.write_edf_ann==True:
+                                anntxt=f'comr_{np.round(reward_val,4)}' #f'current_overall_max_reward_{reward_val}_action_{actionstring}_inprev_{self.step_stim_length}_s'
+                                self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
 
 
-            if self.collect_data_toplot:
-                self.cur_episode_rewards.append(reward_val)
-            if self.log_steps:
-                self.write_tolog(json.dumps({'Episode':self.current_episode, 'Step': self.cur_step, 'Step reward': reward_val}))
-                
-            if self.log_actions_every_step:
-                self.write_tolog(json.dumps({'Action:':reward_val}))
-                self.write_tolog(json.dumps({'Action reward':reward_val}))
-                self.write_tolog(actionstring)
-            self.write_signal_logs()        
-                
+                if self.total_cur_episode_reward>=self.total_episode_max_reward:
+                    self.total_episode_max_reward=self.total_cur_episode_reward
+                    self.best_total_episode_reward_now=True
+                    if self.ws_np is not None:
+                        if self.write_edf_ann==True:
+                            anntxt=f'temr_{np.round(self.total_cur_episode_reward,4)}'#f'current_overall_max_reward_{reward_val}_action_{actionstring}_inprev_{self.step_stim_length}_s'
+                            self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
 
 
-            if self.cur_step<self.n_steps_per_episode:
-                self.done=False
-                self.cur_step+=1
+                if self.collect_data_toplot:
+                    self.cur_episode_rewards.append(reward_val)
+                if self.log_steps:
+                    self.write_tolog(json.dumps({'Episode':self.current_episode, 'Step': self.cur_step, 'Step reward': reward_val}))
+                    
+                if self.log_actions_every_step:
+                    self.write_tolog(json.dumps({'Action:':reward_val}))
+                    self.write_tolog(json.dumps({'Action reward':reward_val}))
+                    self.write_tolog(actionstring)
+                self.write_signal_logs()        
+                    
+
+
+                if self.cur_step<self.n_steps_per_episode:
+                    self.done=False
+                    self.cur_step+=1
+                else:
+                    self.done=True
+                if self.render_each_step==True:
+                    self.render()
+                #print('step_done')
+                if self.log_actions_on_hold==True:
+                    
+                    #print(self.enc_is_holded)
+                    #print(self.current_sample)
+                    if self.enc_is_holded:
+                        self.log_actions()
+                if self.send_reward_to_display:
+                    msg='display_text:'+str(self.text_size)+':'+str(reward)
+                    self.ws_sf.send(msg)
+                return self.new_observations_tarchs, reward, self.done, {} #False
             else:
-                self.done=True
-            if self.render_each_step==True:
-                self.render()
-            #print('step_done')
-            if self.log_actions_on_hold==True:
-                
-                #print(self.enc_is_holded)
-                #print(self.current_sample)
-                if self.enc_is_holded:
-                    self.log_actions()
-            if self.send_reward_to_display:
-                msg='display_text:'+str(self.text_size)+':'+str(reward)
-                self.ws_sf.send(msg)
-            return self.new_observations_tarchs, reward, self.done, {} #False
-        else:
-            print('No connection')
-            return
+                print('No connection')
+                return False, False, False, False #False
+        except:
+            return False, False, False, False
+            #raise CustomExceptionWithDetails("Step unfinished", 'No connection')
     def clear_all_stats(self):
         self.episode_max_reward=0
         self.total_cur_episode_reward=0
@@ -925,26 +949,31 @@ class SFSystemCommunicator(gym.Env):
         self.best_overall_reward_now=False
         self.best_total_episode_reward_now=False
     def close(self, clear_log=False):
-        self.ws_sf.send("turn_off_display")
+        if self.ws_sf.connected:
+            self.ws_sf.send("turn_off_display")
+            self.stop_audiovis_feedback() #just in case
+            self.ws_sf.send("stop_data_transfer_from_ads") #just in case
         if self.log_best_actions_final:
             if str(self.best_action_overall) != 'None':
                 actionstring=self.get_json_string_from_ordered_dict(self.best_action_overall)
                 self.write_tolog(json.dumps({'Best action across episodes reward':self.overall_max_reward}))
                 self.write_tolog(actionstring)
-        self.stop_audiovis_feedback() #just in case
-        self.ws_sf.send("stop_data_transfer_from_ads") #just in case
-        if self.use_neuroplay:
-            self.ws_np.send("stopSearch")
-            self.ws_np.send("close")
+        if self.ws_np.connected:
+            if self.use_neuroplay:
+                self.ws_np.send("stopSearch")
+                self.ws_np.send("close")
         self.cur_step=0 #just in case
         self.current_episode=0
 
         self.clear_reward_buffers()
         self.clear_reward_stats()
-        try:
+        #try:
+        if self.ws_np.connected:
             self.stop_edf_log()
-        except Exception as e:
-            print(f'On env close received {e}')
+        #except Exception as e:
+        #    print(f'On env close received {e}')
+            #return True
+        
         if clear_log:
             self.clear_log()
         if self.ws_sf.sock is not None:
@@ -1133,15 +1162,25 @@ class stable_baselines_model_trainer():
         return
 
     def static_launch(self):
-        if  self.env.use_neuroplay==True:
-            if self.env.write_edf_ann==True:
-                self.env.write_edf_annotation_fn('started_static_run', self.env.delay)
-        self.orig_env.step(self.orig_env.default_actions)
+        try:
+            if  self.env.use_neuroplay==True:
+                if self.env.write_edf_ann==True:
+                    self.env.write_edf_annotation_fn('started_static_run', self.env.delay)
+            r1, r2, r3, r4 = self.orig_env.step(self.orig_env.default_actions)
+            if str(r4)=='False':
+                return False
+        except:
+            return True
     def dynamic_launch(self):
         if self.env.use_neuroplay==True:
             if self.env.write_edf_ann==True:
                 self.env.write_edf_annotation_fn('started_dynamic_run', self.env.delay)
-        self.env.step(self.env.action_space.sample())
+        try:
+            r1, r2, r3, r4 = self.env.step(self.env.action_space.sample())
+            if str(r4)=='False':
+                return False
+        except:
+            return True
     def set_model(self):
         if self.algorithm=='PPO':
             self.model = PPO(self.policy, self.env, n_steps=self.n_steps_per_timestep)

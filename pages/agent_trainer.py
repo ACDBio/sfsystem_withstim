@@ -1237,6 +1237,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
             except Exception as e:
                 print(f"On environment stop received: {e}")
         return b_vis, b_vis, b_vis, b_invis, b_invis, True, info_upd_interval, b_vis, 'stop', b_vis, b_invis, b_vis, b_invis, True, timer_interval_ms
+    
         
 def start_session_direct_feedback(arg):
     global env
@@ -1266,9 +1267,10 @@ def start_session_direct_feedback(arg):
             print(f"Training thread terminated: {e}")
             try:
                 trainer.env.close()
+                return
             except Exception as e:
                 print(f"On environment closure: {e}")
-            break
+                return
 
 
 
@@ -1299,9 +1301,11 @@ def start_session_trained_model(arg):
             print(f"Training thread terminated: {e}")
             try:
                 trainer.env.close()
+                return
             except Exception as e:
                 print(f"On environment closure: {e}")
-            break
+                return
+            
 
 
          
@@ -1316,8 +1320,10 @@ def start_training(sd):
         print(f"Training thread terminated: {e}")
         try:
             env.close()
+            return
         except Exception as e2:
             print(e2)
+            return
         
 
 def start_session_static():
@@ -1341,13 +1347,21 @@ def start_session_notrain(arg):
         try:
             print(env_paused)
             if env_paused==False:
-                trainer.dynamic_launch()
-                nsteps_notrain-=1
-                #print(trainer.env.current_sample)
-                #print(trainer.env.enc_is_clicked)
-                if pause_on_click==True:
-                    if trainer.env.enc_is_clicked==1:
-                        env_paused=True
+                try:
+                    res=trainer.dynamic_launch()
+                    if res==True:
+                        nsteps_notrain=0
+                        break
+                    else:
+                        nsteps_notrain-=1
+                        #print(trainer.env.current_sample)
+                        #print(trainer.env.enc_is_clicked)
+                        if pause_on_click==True:
+                            if trainer.env.enc_is_clicked==1:
+                                env_paused=True
+                except:
+                    print('HERE')
+                    break
 
             else:
                 trainer.env.sample_observations()
@@ -1355,13 +1369,16 @@ def start_session_notrain(arg):
                     env_paused=False
 
         except Exception as e:
+            break
             n_steps_notrain=0
             print(f"Training thread terminated: {e}")
             try:
                 trainer.env.close()
+                return
             except Exception as e2:
                 print(f"On environment closure: {e2}")
-            break
+                return
+            
             
 
 
