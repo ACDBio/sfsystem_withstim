@@ -138,9 +138,17 @@ class SFSystemCommunicator(gym.Env):
                  edf_rf_annotation=False,
                  edf_rf_annotation_threshold=1,
                  send_reward_to_display=False,
-                 text_size=1
-                 ):
+                 text_size=1,
+                 reward_np_sigqual_thresh=90,
+                 basic_np_sigqual_thresh=80,
+                 send_np_sigqual_to_display=True):
         
+
+        self.reward_np_sigqual_thresh=reward_np_sigqual_thresh
+        self.basic_np_sigqual_thresh=basic_np_sigqual_thresh
+        self.send_np_sigqual_to_display=send_np_sigqual_to_display
+
+
         self.reward_cur=None
         self.send_reward_to_display=send_reward_to_display
         self.text_size=text_size
@@ -303,6 +311,43 @@ class SFSystemCommunicator(gym.Env):
         self.figures={'signal_fig':[],'training_fig':[]}
         self.colornames=color_names
         self.cur_action_log_no=0
+        self.get_np_sig_qual()
+
+    def get_np_sig_qual(self):
+        print('Sampling signal quality')
+        self.ws_np.send('CurrentDeviceInfo')
+        devinfo=json.loads(self.ws_np.recv())
+        chnames=devinfo["currentChannelsNames"]
+        quals=devinfo["quality"]
+        res={}
+        for i in range(len(chnames)):
+             res[chnames[i]]=quals[i]
+        self.chquals=res
+
+    def np_reward_sig_qual_filter(self, thresh=None):
+        if str(thresh)=='None':
+            if str(self.reward_np_sigqual_thresh)!='None':
+                thresh=self.reward_np_sigqual_thresh
+        res=True
+        if str(thresh)!='None':
+            for ch in self.rewardchnames:
+                if self.chquals[ch]<thresh:
+                    res=False
+        self.reward_sig_qual_filter_status=res
+        return res
+    
+    def np_basic_sig_qual_filter(self, thresh=None):
+        if str(thresh)=='None':
+            if str(self.reward_np_sigqual_thresh)!='None':
+                thresh=self.basic_np_sigqual_thresh
+        res=True
+        if str(thresh)!='None':
+            for ch in self.chquals.keys():
+                if self.chquals[ch]<thresh:
+                    res=False
+        self.basic_sig_qual_filter_status=res
+        return res
+
     def run_neuroplay(self):
         neuroplay_loc = '/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
         os.system(f'bash {neuroplay_loc}')
@@ -391,6 +436,7 @@ class SFSystemCommunicator(gym.Env):
         ftokens=re.split(r'[+/)(*]+',self.reward_formula_string)
         self.rewarddict={}
         self.tokendict={}
+        self.rewardchnames=[]
         for token in ftokens:
             if 'ch' in token:
                 self.rewarddict[token]=None
@@ -400,6 +446,7 @@ class SFSystemCommunicator(gym.Env):
                 for subtoken in subtokens:
                     if 'ch' in subtoken:
                         self.tokendict[token]['channelindex']=int(subtoken.split('h')[1])
+                        self.rewardchannels=self.all_input_channels[self.tokendict[token]['channelindex']]
                     if subtoken=='freq':
                         tfreq=float(subtokens[1])
                         self.tokendict[token]['freqdata']=tfreq
@@ -418,6 +465,7 @@ class SFSystemCommunicator(gym.Env):
                             bin_lst[i]=val
                         self.tokendict[token]['freqdata']=tuple(bin_lst)
                         self.tokendict[token]['fbin_idx']=self.fbins.index(self.tokendict[token]['freqdata'])
+        self.rewardchnames=list(set(self.rewardchnames))
     def set_default_actions(self):
         action_space_sample=self.action_space.sample()
         for key1 in action_space_sample:
@@ -648,6 +696,13 @@ class SFSystemCommunicator(gym.Env):
             #raise CustomExceptionWithDetails("Unable to sample", "")
     
     def sample_observations(self, use_synth_data=False): #True for testing of fft etc., False - for actual application
+
+        if self.ws_np is not None:
+            self.get_np_sig_qual()
+            self.np_reward_sig_qual_filter()
+            self.np_basic_sig_qual_filter()
+
+
         if self.use_sf==True:
             sf_thread = threading.Thread(target=self.sample_fromsf)
             sf_thread.daemon = True
@@ -764,7 +819,10 @@ class SFSystemCommunicator(gym.Env):
 
                 self.update_audiovis_feedback(update_dict=action)
                 time.sleep(self.step_stim_length)
-                
+                # if self.ws_np is not None:
+                #     self.get_np_sig_qual()
+                #     self.np_reward_sig_qual_filter()
+                #     self.np_basic_sig_qual_filter()
                 new_observations=self.sample_and_process_observations_from_device()
                 self.cur_observations=new_observations
                 reward=self.get_reward(observations=new_observations, toreturn=True)
@@ -814,7 +872,10 @@ class SFSystemCommunicator(gym.Env):
                     self.cur_episode_rewards.append(reward_val)
                 if self.log_steps:
                     self.write_tolog(json.dumps({'Episode':self.current_episode, 'Step': self.cur_step, 'Step reward': reward_val}))
-                    
+                    if self.ws_np is not None:
+                        self.write_tolog(json.dumps({'NP chqual':self.chquals, 'NP reward qual filter status':self.reward_sig_qual_filter_status, 'NP reward sig qual filter thresh': self.reward_np_sigqual_thresh}))
+
+
                 if self.log_actions_every_step:
                     self.write_tolog(json.dumps({'Action:':reward_val}))
                     self.write_tolog(json.dumps({'Action reward':reward_val}))
@@ -837,9 +898,18 @@ class SFSystemCommunicator(gym.Env):
                     #print(self.current_sample)
                     if self.enc_is_holded:
                         self.log_actions()
-                if self.send_reward_to_display:
-                    msg='display_text:'+str(self.text_size)+':'+str(reward)
+                if self.send_reward_to_display and not self.send_np_sigqual_to_display:
+                    msg='display_text:'+str(self.text_size)+':'+str(np.round(reward,3))
                     self.ws_sf.send(msg)
+                if self.send_np_sigqual_to_display and not self.send_reward_to_display:
+                    sigquals=json.dumps(self.chquals)
+                    msg='display_text:'+'1'+':'+str(sigquals)
+                    self.ws_sf.send(msg)
+                if self.send_reward_to_display and self.send_np_sigqual_to_display:
+                    sigquals=json.dumps(self.chquals)
+                    msg='display_text:'+'1'+':'+f'R {np.round(reward,3)} Quals {sigquals}'
+
+
                 return self.new_observations_tarchs, reward, self.done, {} #False
             else:
                 print('No connection')
@@ -1080,7 +1150,16 @@ from stable_baselines3 import PPO, SAC, DDPG, TD3, A2C, DQN
 from IPython.display import clear_output
 
 class stable_baselines_model_trainer():
-    def __init__(self, initialized_environment, algorithm='A2C', policy='MlpPolicy', logfn='model_stats.log', n_steps_per_timestep=1):
+    def __init__(self, initialized_environment, algorithm='A2C', policy='MlpPolicy', logfn='model_stats.log', n_steps_per_timestep=1,
+                    start_on_click=False,
+                    pause_learning_if_reward_sig_qual_false=False,
+                    start_on_reward_sig_qual=False):
+        self.start_on_click=start_on_click
+        self.pause_learning_if_reward_sig_qual_false=pause_learning_if_reward_sig_qual_false
+        self.start_on_reward_sig_qual=start_on_reward_sig_qual
+
+
+
         self.env=initialized_environment
         self.orig_env=initialized_environment
         self.env = FlattenObservation(self.env)
@@ -1206,77 +1285,116 @@ class stable_baselines_model_trainer():
     def close_env(self):
         self.env.close()
 
-    def train(self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps=1, log_or_plot_every_n_timesteps=1, jnb=False,  pause_on_click=False):
+    def train(self, num_episodes=5, log_model=True, get_plots=False, render_plots=False,n_total_timesteps=1, log_or_plot_every_n_timesteps=1, 
+              jnb=False,  pause_on_click=False):
         print(self.env.edfpath)
         self.n_total_timesteps=n_total_timesteps
         self.num_episodes=num_episodes
         env_paused=False
+
+        start=True
+        if  self.start_on_click==True:
+            start=False
+            while start==False:
+                self.env.sample_observations()
+                if self.env.is_clicked:
+                    start=True
+                    self.ws_sf.send('display_text:2:STARTED')
+                    break
+                else:
+                    self.ws_sf.send('display_text:2:AWAITING ENC CLICK')
+        if  self.start_on_reward_sig_qual == True:
+            start=False
+            while start==False:
+                self.env.sample_observations()
+                if self.env.reward_sig_qual_filter_status:
+                    start=True
+                    self.ws_sf.send('display_text:2:STARTED')
+                    break
+                else:
+                    self.ws_sf.send('display_text:2:AWAITING QUALITY SIGNAL')
+
         if self.env.use_neuroplay==True:
             if self.env.write_edf_ann==True:
                 self.env.write_edf_annotation_fn('started_training_run', self.env.delay)
-        if self.env.ws_sf.sock is not None:
-            self.training_completed=False
-            #if n_total_timesteps=='episode':
-            #    n_total_timesteps=int(self.env.n_steps_per_episode/self.n_steps_per_timestep) #we run one episode + 1 step before resetting, episode 
-            for i in range(num_episodes):
-                self.cur_episode_no=i
-                self.cur_n_timesteps=0
-                while self.cur_n_timesteps<int(n_total_timesteps): #here-for A2C
-                    if self.env.ws_sf.sock is not None:
-                        if env_paused==False:
-                            if self.env.use_neuroplay==True:
-                                if self.env.write_edf_ann==True:
-                                    self.env.write_edf_annotation_fn(f't_episode_{i}', self.env.delay)
-                            #print('h1')
-                            self.model.learn(total_timesteps=log_or_plot_every_n_timesteps)
-                            #print('h2')
-                            #print(self.env.enc_is_clicked)
-                            #print(self.env.current_sample)
-                            self.cur_n_timesteps+=log_or_plot_every_n_timesteps
-                            if render_plots:
-                                if get_plots:
-                                    self.figs=self.env.render(return_figs=True)
-                                else:
-                                    self.env.render()
-                                if jnb:
-                                    clear_output(wait=True)
-                            if log_model:
-                                self.model.save("last_model")
-                                with open(self.logfn, 'a') as log_file:
-                                        self.stat0=f'target {self.env.reward_formula_string}, current last_model reward {self.env.reward_cur}, file best_overall_reward_model'
-                                        log_file.write(self.stat0 + '\n')                                
-                                if self.env.best_overall_reward_now:
-                                    self.model.save("best_overall_reward_model")
+        if start:
+            if self.env.ws_sf.sock is not None:
+                self.training_completed=False
+                #if n_total_timesteps=='episode':
+                #    n_total_timesteps=int(self.env.n_steps_per_episode/self.n_steps_per_timestep) #we run one episode + 1 step before resetting, episode 
+                for i in range(num_episodes):
+                    self.cur_episode_no=i
+                    self.cur_n_timesteps=0
+                    while self.cur_n_timesteps<int(n_total_timesteps): #here-for A2C
+                        if self.env.ws_sf.sock is not None:
+                            if env_paused==False:
+                                if self.env.use_neuroplay==True:
+                                    if self.env.write_edf_ann==True:
+                                        self.env.write_edf_annotation_fn(f't_episode_{i}', self.env.delay)
+                                #print('h1')
+                                tocontinue=True
+                                if self.pause_learning_if_reward_sig_qual_false==True:
+                                    tocontinue=False
+                                    while tocontinue==False:
+                                        self.env.sample_observations()
+                                        if self.env.reward_sig_qual_filter_status:
+                                            self.ws_sf.send('display_text:1:SIGNAL OK')
+                                            tocontinue=True
+                                            break
+                                        else:
+                                            self.ws_sf.send('display_text:1:AWAITING QUALITY SIGNAL')
+                                            
+                                            
+
+                                self.model.learn(total_timesteps=log_or_plot_every_n_timesteps)
+                                #print('h2')
+                                #print(self.env.enc_is_clicked)
+                                #print(self.env.current_sample)
+                                self.cur_n_timesteps+=log_or_plot_every_n_timesteps
+                                if render_plots:
+                                    if get_plots:
+                                        self.figs=self.env.render(return_figs=True)
+                                    else:
+                                        self.env.render()
+                                    if jnb:
+                                        clear_output(wait=True)
+                                if log_model:
+                                    self.model.save("last_model")
                                     with open(self.logfn, 'a') as log_file:
-                                        self.stat1=f'target {self.env.reward_formula_string}, current best_overall_reward_model reward {self.env.overall_max_reward}, file best_overall_reward_model'
-                                        log_file.write(self.stat1 + '\n')
-                                if self.env.best_total_episode_reward_now:
-                                    self.model.save("best_total_episode_reward_model")
-                                    with open(self.logfn, 'a') as log_file:
-                                        self.stat2=f'target {self.env.reward_formula_string}, current best_total_episode_reward_model reward {self.env.total_episode_max_reward}, file best_total_episode_reward_model'
-                                        log_file.write(self.stat2 + '\n')
-                            if pause_on_click==True:
+                                            self.stat0=f'target {self.env.reward_formula_string}, current last_model reward {self.env.reward_cur}, file best_overall_reward_model'
+                                            log_file.write(self.stat0 + '\n')                                
+                                    if self.env.best_overall_reward_now:
+                                        self.model.save("best_overall_reward_model")
+                                        with open(self.logfn, 'a') as log_file:
+                                            self.stat1=f'target {self.env.reward_formula_string}, current best_overall_reward_model reward {self.env.overall_max_reward}, file best_overall_reward_model'
+                                            log_file.write(self.stat1 + '\n')
+                                    if self.env.best_total_episode_reward_now:
+                                        self.model.save("best_total_episode_reward_model")
+                                        with open(self.logfn, 'a') as log_file:
+                                            self.stat2=f'target {self.env.reward_formula_string}, current best_total_episode_reward_model reward {self.env.total_episode_max_reward}, file best_total_episode_reward_model'
+                                            log_file.write(self.stat2 + '\n')
+                                if pause_on_click==True:
+                                    if self.env.enc_is_clicked==1:
+                                        env_paused=True
+                            else:
+                                self.env.step(self.env.flatten_and_normalize_action(self.orig_env.action_space, self.env.current_actions))
+                                self.env.sample_observations()
                                 if self.env.enc_is_clicked==1:
-                                    env_paused=True
+                                    env_paused=False                            
+                        
+                            self.env.clear_all_stats()
                         else:
-                            self.env.step(self.env.flatten_and_normalize_action(self.orig_env.action_space, self.env.current_actions))
-                            self.env.sample_observations()
-                            if self.env.enc_is_clicked==1:
-                                env_paused=False                            
-                    
-                        self.env.clear_all_stats()
-                    else:
-                        print('Connection stopped.')
-                        break
-            
-            self.env.stop_audiovis_feedback()
-            self.training_completed=True 
-            if self.env.use_neuroplay==True:
-                self.env.pause_edf_log()   
-            return     
-        else:
-            print('No connection.')
-            return  
+                            print('Connection stopped.')
+                            break
+                
+                self.env.stop_audiovis_feedback()
+                self.training_completed=True 
+                if self.env.use_neuroplay==True:
+                    self.env.pause_edf_log()   
+                return     
+            else:
+                print('No connection.')
+                return  
     def collect_environment_data(self):
         env_data=dict()
         env_data['out_dict']=self.env.out_dict

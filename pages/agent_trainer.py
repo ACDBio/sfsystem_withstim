@@ -333,8 +333,12 @@ layout=html.Div(
                 'Reset stage length: ',
                 dcc.Input(type='number', placeholder='Length, s', value=10, id='stim_length_on_reset'), 
                 html.Br(),
-
-
+                dcc.Checklist(options=['Start training using Neuroplay reward signal quality threshold'], value=['Start training using Neuroplay reward signal quality threshold'], id='start_on_reward_sig_qual'),
+                dcc.Checklist(options=['Pause training when Neuroplay reward signal quality below threshold'], value=['Pause training when Neuroplay reward signal quality below threshold'], id='pause_learning_if_reward_sig_qual_false'),
+                dcc.Checklist(options=['Start training on encoder click'], value=[], id='start_on_click'),
+                html.Br(),
+                'Reward channel quality threshold for Neuroplay: ',
+                dcc.Input(type='number', placeholder='Quality threshold, %', value=90, id='reward_np_sigqual_thresh'),                
             ]),
             html.Br(),
             html.Br(),
@@ -507,6 +511,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 dcc.Input(type='number', placeholder='1,2,3 etc.', value=2, id='text_size'),  
                 html.Br(),
                 dcc.Checklist(options=['Send reward to display'], value=['Send reward to display'], id='send_reward_to_display'),
+                dcc.Checklist(options=["Send Neuroplay signal quality to display"], value=["Send Neuroplay signal quality to display"], id="send_np_sigqual_to_display"),
                 html.Button("Send to display", id="send_display_text", style=b_vis, n_clicks=0),
                 html.Button("Clear display (if anything present)", id="clear_display", style=b_vis, n_clicks=0),                 
                 dcc.Checklist(options=['Pause or restart signal on encoder click'], value=['Pause or restart signal on encoder click'], id='pause_on_click'),
@@ -516,7 +521,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                     id='action_text',
                     value='{"leddelay": [100.0], "lv1r": [190.03234773874283], "lv1g": [168.18682730197906], "lv1b": [255.0], "lv2r": [196.86115473508835], "lv2g": [159.4429063796997], "lv2b": [185.24352610111237], "lv3r": [149.18937146663666], "lv3g": [151.4224249124527], "lv3b": [10.0], "lv4r": [77.70063683390617], "lv4g": [255.0], "lv4b": [255.0], "lv5r": [66.86547353863716], "lv5g": [255.0], "lv5b": [17.525383979082108], "lv6r": [10.0], "lv6g": [237.40646064281464], "lv6b": [110.9641245007515], "lv7r": [213.2022413611412], "lv7g": [255.0], "lv7b": [145.3699791431427], "lv8r": [10.0], "lv8g": [255.0], "lv8b": [182.14710593223572], "wave_1_freq": [14318.983242064714], "wave_2_freq": [6777.882110029459], "panner_freq": [32.50046396255493], "phasor_1_freq": [8.703051596879959], "phasor_2_freq": [9.96783521771431], "phasor_1_min": [1.0], "phasor_2_min": [1.0], "phasor_1_dif": [5.6508409678936005], "phasor_2_dif": [27.42316609621048], "panner_div": [3.862565517425537], "wave_1_type": [3.0], "wave_2_type": [0.5501725673675537], "maxivolume": [9.150283694267273]}',
                     style={'width': '100%', 'height': 150, 'font-size': '14px', 'line-height': '1'},
-                    maxLength=1024, # Adjust the maxLength as needed
+                    maxLength=2024, # Adjust the maxLength as needed
                     rows=32, # Adjust the number of rows as needed
                     cols=128, # Adjust the number of columns as needed
                 ),
@@ -915,7 +920,11 @@ def get_state_from_model_logfile(logfile=None):
           State('send_reward_to_display', 'value'),
           State('text_size','value'),
 
-
+          State('send_np_sigqual_to_display','value'),
+          State('start_on_click','value'),
+          State('pause_learning_if_reward_sig_qual_false','value'),
+          State('start_on_reward_sig_qual', 'value'),
+          State('reward_np_sigqual_thresh', 'value'),
           prevent_initial_call=True)
 def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, n_clicks_stop_direct_feedback, 
                      n_clicks_run_action,  n_clicks_action_from_string,
@@ -936,10 +945,39 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                     edf_rf_annotation_threshold,
                     session_name,
                     send_reward_to_display,
-                    text_size):
+                    text_size,
+                    send_np_sigqual_to_display,
+                    start_on_click,
+                    pause_learning_if_reward_sig_qual_false,
+                    start_on_reward_sig_qual,
+                    reward_np_sigqual_thresh,
+
+                    ):
     
 
     edf_ann_fn=session_name+'_edf'
+
+    if len(start_on_reward_sig_qual)>0:
+        start_on_reward_sig_qual=True
+    else:
+        start_on_reward_sig_qual=False
+
+
+    if len(pause_learning_if_reward_sig_qual_false)>0:
+        pause_learning_if_reward_sig_qual_false=True
+    else:
+        pause_learning_if_reward_sig_qual_false=False
+
+    if len(start_on_click)>0:
+        start_on_click=True
+    else:
+        start_on_click=False
+
+    if len(send_np_sigqual_to_display)>0:
+        send_np_sigqual_to_display=True
+    else:
+        send_np_sigqual_to_display=False
+
     if len(send_reward_to_display)>0:
         send_reward_to_display=True
     else:
@@ -1026,7 +1064,9 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 write_edf_ann=write_edf_ann,
                                                 edf_ann_fn=edf_ann_fn,
                                                 send_reward_to_display=send_reward_to_display,
-                                                text_size=text_size)
+                                                text_size=text_size,
+                                                reward_np_sigqual_thresh=reward_np_sigqual_thresh,
+                                                send_np_sigqual_to_display=send_np_sigqual_to_display)
         time.sleep(5)    
 
                 #print(sd)
@@ -1037,7 +1077,10 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                                 algorithm=sd['algorithm'],
                                                                 policy='MlpPolicy',
                                                                 logfn='model_stats.log',
-                                                                n_steps_per_timestep=sd['n_steps_per_timestep'])
+                                                                n_steps_per_timestep=sd['n_steps_per_timestep'],
+                                                                start_on_click=start_on_click,
+                                                                pause_learning_if_reward_sig_qual_false=pause_learning_if_reward_sig_qual_false,
+                                                                start_on_reward_sig_qual=start_on_reward_sig_qual)
                 
 
             training_args={
@@ -1151,13 +1194,18 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                             write_edf_ann=write_edf_ann,
                                             edf_ann_fn=edf_ann_fn,
                                             send_reward_to_display=send_reward_to_display,
-                                            text_size=text_size)    
+                                            text_size=text_size,
+                                            reward_np_sigqual_thresh=reward_np_sigqual_thresh,
+                                            send_np_sigqual_to_display=send_np_sigqual_to_display)    
         time.sleep(20) 
         trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                             algorithm=sd['algorithm'],
                                                             policy='MlpPolicy',
                                                             logfn='model_stats.log',
-                                                            n_steps_per_timestep=sd['n_steps_per_timestep'])
+                                                            n_steps_per_timestep=sd['n_steps_per_timestep'],
+                                                            start_on_click=start_on_click,
+                                                            pause_learning_if_reward_sig_qual_false=pause_learning_if_reward_sig_qual_false,
+                                                            start_on_reward_sig_qual=start_on_reward_sig_qual)
         trainer.load_model(f'session_lib/{session_name}/{model_name}')
         if len(train_logged_orig)==0 and len(train_logged_new)==0:
             training_thread = threading.Thread(target=start_session_trained_model, args=({'n_steps_notrain':n_steps_notrain,
