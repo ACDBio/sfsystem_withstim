@@ -141,6 +141,7 @@ class SFSystemCommunicator(gym.Env):
                  text_size=1
                  ):
         
+        self.reward_cur=None
         self.send_reward_to_display=send_reward_to_display
         self.text_size=text_size
 
@@ -768,6 +769,7 @@ class SFSystemCommunicator(gym.Env):
                 self.cur_observations=new_observations
                 reward=self.get_reward(observations=new_observations, toreturn=True)
                 reward_val=reward.tolist()
+                #if action!=self.default_actions:
                 self.reward_cur=reward
                 self.total_cur_episode_reward+=reward_val
                 if self.ws_np is not None:
@@ -1239,6 +1241,10 @@ class stable_baselines_model_trainer():
                                 if jnb:
                                     clear_output(wait=True)
                             if log_model:
+                                self.model.save("last_model")
+                                with open(self.logfn, 'a') as log_file:
+                                        self.stat0=f'target {self.env.reward_formula_string}, current last_model reward {self.env.reward_cur}, file best_overall_reward_model'
+                                        log_file.write(self.stat0 + '\n')                                
                                 if self.env.best_overall_reward_now:
                                     self.model.save("best_overall_reward_model")
                                     with open(self.logfn, 'a') as log_file:
@@ -1275,10 +1281,11 @@ class stable_baselines_model_trainer():
         env_data=dict()
         env_data['out_dict']=self.env.out_dict
         env_data['session_settings']=dict()
-        env_data['session_settings']['n_input_channels']=self.env.n_input_channels
-        env_data['session_settings']['channels_of_interest_inds']=self.env.channels_of_interest_inds
+        env_data['channels_of_interest']=self.env.sel_input_channels
+      #  env_data['session_settings']['n_input_channels']=self.env.n_input_channels #should correct this!
+      #  env_data['session_settings']['channels_of_interest_inds']=self.env.channels_of_interest_inds
         env_data['session_settings']['n_timepoints_per_sample']=self.env.n_timepoints_per_sample
-        env_data['session_settings']['max_sfsystem_output']=self.env.max_sfsystem_output
+      #  env_data['session_settings']['max_sfsystem_output']=self.env.max_sfsystem_output
         env_data['session_settings']['reward_formula_string']=self.env.reward_formula_string
         env_data['session_settings']['fbins']=self.env.fbins
         env_data['session_settings']['delay']=self.env.delay

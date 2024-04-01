@@ -237,9 +237,9 @@ layout=html.Div(
                 'Delay between datapoints (if Neuroplay is used,   will be set aautomatically to match): ',
                 dcc.Input(type='number', placeholder='Delay, ms', value=10, id='delay'), 
                 html.Br(), 
-                'Max ADS output: ',
-                dcc.Input(type='number', placeholder='Value', value=1023, id='max_sfsystem_output'),
-                html.Br(),         
+               # 'Max ADS output: ',
+               # dcc.Input(type='number', placeholder='Value', value=1023, id='max_sfsystem_output'),
+               # html.Br(),         
                 'Data types to use in observational space: ',
                 dcc.Dropdown(options=['Raw signal values','Frequency spectra', 'Frequency bin values'], value=['Raw signal values','Frequency spectra', 'Frequency bin values'], id='obs_space_opts', multi=True), 
                 html.Br(),      
@@ -735,7 +735,7 @@ def copy_session_logs_to_lib(n_clicks, sname):
     os.mkdir(session_dir)
     cfiles=os.listdir('./')
     for f in cfiles:
-        if f in ['current_training.log', 'model_stats.log','best_total_episode_reward_model.zip','best_overall_reward_model.zip']:
+        if f in ['current_training.log', 'model_stats.log','best_total_episode_reward_model.zip','best_overall_reward_model.zip' ,'last_model.zip']:
             copy_file(f'./{f}', session_dir)
         if 'act' in f:  #copy actions
             copy_file(f'./{f}', session_dir)
@@ -988,7 +988,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 #n_input_channels=sd['n_input_channels'],
                                                 input_channels=sd['channels_of_interest'],
                                                 n_timepoints_per_sample=sd['n_timepoints_per_sample'],
-                                                max_sfsystem_output=sd['max_sfsystem_output'],
+                                                #max_sfsystem_output=sd['max_sfsystem_output'],
                                                 reward_formula_string=sd['reward_formula_string'],
                                                 fbins=sd['fbins'],
                                                 delay=sd['delay'],
@@ -1111,27 +1111,26 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                         sd[key]=sd_s[key]
         
         env = SFSystemCommunicator(out_dict=out_dict,
-                                              n_input_channels=sd['n_input_channels'],
-                                              channels_of_interest=sd['channels_of_interest'],
-                                              n_timepoints_per_sample=sd['n_timepoints_per_sample'],
-                                              max_sfsystem_output=sd['max_sfsystem_output'],
-                                              reward_formula_string=sd['reward_formula_string'],
-                                              fbins=sd['fbins'],
-                                              delay=sd['delay'],
-                                              use_raw_in_os_def=sd['use_raw_in_os_def'],
-                                              use_freq_in_os_def=sd['use_freq_in_os_def'],
-                                              use_fbins_in_os_def=sd['use_fbins_in_os_def'],
-                                              device_address=sd['device_address'],
-                                              step_stim_length_millis=sd['step_stim_length_millis'],
-                                              episode_time_seconds=sd['episode_time_seconds'],
-                                              logfn=sd['logfn'],
-                                              log_steps=sd['log_steps'],
-                                              log_episodes=sd['log_episodes'],
-                                              log_best_actions_final=sd['log_best_actions_final'],
-                                              signal_plot_width=sd['signal_plot_width'],
-                                              signal_plot_height=sd['signal_plot_height'],
-                                              training_plot_width=sd['training_plot_width'],
-                                              training_plot_height=sd['training_plot_height'],
+                                                input_channels=sd['channels_of_interest'],
+                                                n_timepoints_per_sample=sd['n_timepoints_per_sample'],
+                                                #max_sfsystem_output=sd['max_sfsystem_output'],
+                                                reward_formula_string=sd['reward_formula_string'],
+                                                fbins=sd['fbins'],
+                                                delay=sd['delay'],
+                                                use_raw_in_os_def=sd['use_raw_in_os_def'],
+                                                use_freq_in_os_def=sd['use_freq_in_os_def'],
+                                                use_fbins_in_os_def=sd['use_fbins_in_os_def'],
+                                                device_address=sd['device_address'],
+                                                step_stim_length_millis=sd['step_stim_length_millis'],
+                                                episode_time_seconds=sd['episode_time_seconds'],
+                                                logfn=sd['logfn'],
+                                                log_steps=sd['log_steps'],
+                                                log_episodes=sd['log_episodes'],
+                                                log_best_actions_final=sd['log_best_actions_final'],
+                                                signal_plot_width=sd['signal_plot_width'],
+                                                signal_plot_height=sd['signal_plot_height'],
+                                                training_plot_width=sd['training_plot_width'],
+                                                training_plot_height=sd['training_plot_height'],
                                               write_raw=sd['write_raw'],
                                               write_fft=sd['write_fft'],
                                               write_bins=sd['write_bins'],
@@ -1153,7 +1152,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                             edf_ann_fn=edf_ann_fn,
                                             send_reward_to_display=send_reward_to_display,
                                             text_size=text_size)    
-        time.sleep(5) 
+        time.sleep(20) 
         trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                             algorithm=sd['algorithm'],
                                                             policy='MlpPolicy',
@@ -1415,7 +1414,7 @@ def start_session_notrain(arg):
               Input('channels_of_interest','value'),
               Input('n_timepoints_per_sample','value'),
               Input('delay','value'),
-              Input('max_sfsystem_output','value'),
+             # Input('max_sfsystem_output','value'),
               Input('formula_string','value'),
               Input('fbins','value'),
               Input('device_address','value'),
@@ -1445,7 +1444,9 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
                      panner_div_range,panner_div, phasor_1_freq,phasor_2_freq,phasor_1_span,
                      phasor_2_span,maxivolume, 
                       channels_of_interest,n_timepoints_per_sample,
-                     delay,max_sfsystem_output, formula_string, fbins, device_address,
+                     delay,
+                    # max_sfsystem_output, 
+                     formula_string, fbins, device_address,
                      step_stim_length_millis,episode_time_seconds,n_total_timesteps,
                      num_episodes,logfn,
                      logging_plotting_opts,
@@ -1486,7 +1487,7 @@ def collect_settings(ffminf, ffmaxf, ffinitf, rgbrange,
     session_settings_dict['channels_of_interest']=channels_of_interest.split(',')
     session_settings_dict['n_timepoints_per_sample']=n_timepoints_per_sample
     session_settings_dict['delay']=delay
-    session_settings_dict['max_sfsystem_output']=max_sfsystem_output
+    #session_settings_dict['max_sfsystem_output']=max_sfsystem_output
     session_settings_dict['reward_formula_string']=formula_string
     session_settings_dict['use_unfiltered_np_data']=use_unfiltered_np_data
     binlist=fbins.split(';')
