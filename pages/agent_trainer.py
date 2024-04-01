@@ -511,7 +511,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 dcc.Input(type='number', placeholder='1,2,3 etc.', value=2, id='text_size'),  
                 html.Br(),
                 dcc.Checklist(options=['Send reward to display'], value=['Send reward to display'], id='send_reward_to_display'),
-                dcc.Checklist(options=["Send Neuroplay signal quality to display"], value=["Send Neuroplay signal quality to display"], id="send_np_sigqual_to_display"),
+                dcc.Checklist(options=["Send Neuroplay signal quality to display"], value=["Send Neuroplay signal quality to display"], id="send_np_signal_to_display"),
                 html.Button("Send to display", id="send_display_text", style=b_vis, n_clicks=0),
                 html.Button("Clear display (if anything present)", id="clear_display", style=b_vis, n_clicks=0),                 
                 dcc.Checklist(options=['Pause or restart signal on encoder click'], value=['Pause or restart signal on encoder click'], id='pause_on_click'),
@@ -816,24 +816,28 @@ def collect_settings(n_intervals, runtype):
                     figure=env.figures['signal_fig'],
                     config={'staticPlot': False},)
     messages=[]
+
     if runtype=='train':
-        messages=[f'Trainer episode N {trainer.cur_episode_no+1} (progress {int(trainer.cur_episode_no*100/trainer.num_episodes)}%)',
-              html.Br(),
-              f'Reward: {trainer.env.reward} ',
-              f'Episode max reward: {trainer.env.episode_max_reward} ',
-              f'Overall max reward: {trainer.env.overall_max_reward} ',
-              html.Br(),
-              f'Total current episode reward: {trainer.env.total_cur_episode_reward} ',
-              f'Total total episode max reward: {trainer.env.total_episode_max_reward} ',
-              html.Br(),
-              f'Environment step N {trainer.env.cur_step} (progress {int(trainer.env.cur_step*100/trainer.env.n_steps_per_episode)}%)',
+        if str(trainer.cur_episode_no)!='None':
+            messages=[f'Trainer episode N {trainer.cur_episode_no+1} (progress {int(trainer.cur_episode_no*100/trainer.num_episodes)}%)',
                 html.Br(),
-                f'{trainer.stat1} {trainer.stat2}',
+                f'Reward: {trainer.env.reward} ',
+                f'Episode max reward: {trainer.env.episode_max_reward} ',
+                f'Overall max reward: {trainer.env.overall_max_reward} ',
                 html.Br(),
-                f'Best action overall: {trainer.env.best_action_overall} (reward {trainer.env.overall_max_reward})',
+                f'Total current episode reward: {trainer.env.total_cur_episode_reward} ',
+                f'Total total episode max reward: {trainer.env.total_episode_max_reward} ',
                 html.Br(),
-                f'Current action: {trainer.env.current_actions}',
-                f'Training completion: {trainer.training_completed}']            
+                f'Environment step N {trainer.env.cur_step} (progress {int(trainer.env.cur_step*100/trainer.env.n_steps_per_episode)}%)',
+                    html.Br(),
+                    f'{trainer.stat1} {trainer.stat2}',
+                    html.Br(),
+                    f'Best action overall: {trainer.env.best_action_overall} (reward {trainer.env.overall_max_reward})',
+                    html.Br(),
+                    f'Current action: {trainer.env.current_actions}',
+                    f'Training completion: {trainer.training_completed}']   
+        else:
+            messages=['Training not launched yet.']         
     return training_fig, signal_fig, messages
 
 
@@ -920,7 +924,7 @@ def get_state_from_model_logfile(logfile=None):
           State('send_reward_to_display', 'value'),
           State('text_size','value'),
 
-          State('send_np_sigqual_to_display','value'),
+          State('send_np_signal_to_display','value'),
           State('start_on_click','value'),
           State('pause_learning_if_reward_sig_qual_false','value'),
           State('start_on_reward_sig_qual', 'value'),
@@ -946,7 +950,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                     session_name,
                     send_reward_to_display,
                     text_size,
-                    send_np_sigqual_to_display,
+                    send_np_signal_to_display,
                     start_on_click,
                     pause_learning_if_reward_sig_qual_false,
                     start_on_reward_sig_qual,
@@ -973,15 +977,18 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
     else:
         start_on_click=False
 
-    if len(send_np_sigqual_to_display)>0:
-        send_np_sigqual_to_display=True
+    if len(send_np_signal_to_display)>0:
+        send_np_signal_to_display=True
     else:
-        send_np_sigqual_to_display=False
+        send_np_signal_to_display=False
 
     if len(send_reward_to_display)>0:
         send_reward_to_display=True
     else:
         send_reward_to_display=False
+
+
+
     if len(edf_rf_annotation)>0:
         edf_rf_annotation=True
     else:
@@ -1066,7 +1073,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 send_reward_to_display=send_reward_to_display,
                                                 text_size=text_size,
                                                 reward_np_sigqual_thresh=reward_np_sigqual_thresh,
-                                                send_np_sigqual_to_display=send_np_sigqual_to_display)
+                                                send_np_signal_to_display=send_np_signal_to_display)
         time.sleep(5)    
 
                 #print(sd)
@@ -1196,7 +1203,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                             send_reward_to_display=send_reward_to_display,
                                             text_size=text_size,
                                             reward_np_sigqual_thresh=reward_np_sigqual_thresh,
-                                            send_np_sigqual_to_display=send_np_sigqual_to_display)    
+                                            send_np_signal_to_display=send_np_signal_to_display)    
         time.sleep(20) 
         trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                             algorithm=sd['algorithm'],

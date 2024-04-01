@@ -141,12 +141,12 @@ class SFSystemCommunicator(gym.Env):
                  text_size=1,
                  reward_np_sigqual_thresh=90,
                  basic_np_sigqual_thresh=80,
-                 send_np_sigqual_to_display=True):
+                 send_np_signal_to_display=True):
         
 
         self.reward_np_sigqual_thresh=reward_np_sigqual_thresh
         self.basic_np_sigqual_thresh=basic_np_sigqual_thresh
-        self.send_np_sigqual_to_display=send_np_sigqual_to_display
+        self.send_np_signal_to_display=send_np_signal_to_display
 
 
         self.reward_cur=None
@@ -898,17 +898,17 @@ class SFSystemCommunicator(gym.Env):
                     #print(self.current_sample)
                     if self.enc_is_holded:
                         self.log_actions()
-                if self.send_reward_to_display and not self.send_np_sigqual_to_display:
+                if self.send_reward_to_display and not self.send_np_signal_to_display:
                     msg='display_text:'+str(self.text_size)+':'+str(np.round(reward,3))
                     self.ws_sf.send(msg)
-                if self.send_np_sigqual_to_display and not self.send_reward_to_display:
-                    sigquals=json.dumps(self.chquals)
+                if self.send_np_signal_to_display and not self.send_reward_to_display:
+                    sigquals=' '.join([f'{ch} {i}' for ch,i in self.chquals.items()])
                     msg='display_text:'+'1'+':'+str(sigquals)
                     self.ws_sf.send(msg)
-                if self.send_reward_to_display and self.send_np_sigqual_to_display:
-                    sigquals=json.dumps(self.chquals)
+                if self.send_reward_to_display and self.send_np_signal_to_display:
+                    sigquals=' '.join([f'{ch} {i}' for ch,i in self.chquals.items()])
                     msg='display_text:'+'1'+':'+f'R {np.round(reward,3)} Quals {sigquals}'
-
+                    self.ws_sf.send(msg)
 
                 return self.new_observations_tarchs, reward, self.done, {} #False
             else:
@@ -1299,20 +1299,20 @@ class stable_baselines_model_trainer():
                 self.env.sample_observations()
                 if self.env.is_clicked:
                     start=True
-                    self.ws_sf.send('display_text:2:STARTED')
+                    self.env.ws_sf.send('display_text:2:STARTED')
                     break
                 else:
-                    self.ws_sf.send('display_text:2:AWAITING ENC CLICK')
+                    self.env.ws_sf.send('display_text:2:AWAITING ENC CLICK')
         if  self.start_on_reward_sig_qual == True:
             start=False
             while start==False:
                 self.env.sample_observations()
                 if self.env.reward_sig_qual_filter_status:
                     start=True
-                    self.ws_sf.send('display_text:2:STARTED')
+                    self.env.ws_sf.send('display_text:2:STARTED')
                     break
                 else:
-                    self.ws_sf.send('display_text:2:AWAITING QUALITY SIGNAL')
+                    self.env.ws_sf.send('display_text:2:AWAITING QUALITY SIGNAL')
 
         if self.env.use_neuroplay==True:
             if self.env.write_edf_ann==True:
@@ -1338,11 +1338,11 @@ class stable_baselines_model_trainer():
                                     while tocontinue==False:
                                         self.env.sample_observations()
                                         if self.env.reward_sig_qual_filter_status:
-                                            self.ws_sf.send('display_text:1:SIGNAL OK')
+                                            self.env.ws_sf.send('display_text:1:SIGNAL OK')
                                             tocontinue=True
                                             break
                                         else:
-                                            self.ws_sf.send('display_text:1:AWAITING QUALITY SIGNAL')
+                                            self.env.ws_sf.send('display_text:1:AWAITING QUALITY SIGNAL')
                                             
                                             
 
