@@ -325,15 +325,20 @@ class SFSystemCommunicator(gym.Env):
         self.chquals=res
 
     def np_reward_sig_qual_filter(self, thresh=None):
+        print('Reward sig quality filter assessment')
         if str(thresh)=='None':
             if str(self.reward_np_sigqual_thresh)!='None':
                 thresh=self.reward_np_sigqual_thresh
         res=True
+        print(thresh)
+        print(self.np_rewardchnames)
+        print(self.chquals)
         if str(thresh)!='None':
-            for ch in self.rewardchnames:
+            for ch in self.np_rewardchnames:
                 if self.chquals[ch]<thresh:
                     res=False
         self.reward_sig_qual_filter_status=res
+        print(res)
         return res
     
     def np_basic_sig_qual_filter(self, thresh=None):
@@ -446,7 +451,7 @@ class SFSystemCommunicator(gym.Env):
                 for subtoken in subtokens:
                     if 'ch' in subtoken:
                         self.tokendict[token]['channelindex']=int(subtoken.split('h')[1])
-                        self.rewardchannels=self.all_input_channels[self.tokendict[token]['channelindex']]
+                        self.rewardchnames.append(self.all_input_channels[self.tokendict[token]['channelindex']])
                     if subtoken=='freq':
                         tfreq=float(subtokens[1])
                         self.tokendict[token]['freqdata']=tfreq
@@ -466,6 +471,10 @@ class SFSystemCommunicator(gym.Env):
                         self.tokendict[token]['freqdata']=tuple(bin_lst)
                         self.tokendict[token]['fbin_idx']=self.fbins.index(self.tokendict[token]['freqdata'])
         self.rewardchnames=list(set(self.rewardchnames))
+        self.np_rewardchnames=[]
+        for i in self.rewardchnames:
+            if 'np' in i:
+                self.np_rewardchnames.append(i.split('_')[1])
     def set_default_actions(self):
         action_space_sample=self.action_space.sample()
         for key1 in action_space_sample:
@@ -1306,7 +1315,9 @@ class stable_baselines_model_trainer():
         if  self.start_on_reward_sig_qual == True:
             start=False
             while start==False:
+                print('Sampling for signal quality on training start')
                 self.env.sample_observations()
+                print(self.env.chquals)
                 if self.env.reward_sig_qual_filter_status:
                     start=True
                     self.env.ws_sf.send('display_text:2:STARTED')
@@ -1336,7 +1347,9 @@ class stable_baselines_model_trainer():
                                 if self.pause_learning_if_reward_sig_qual_false==True:
                                     tocontinue=False
                                     while tocontinue==False:
+                                        print('Sampling for signal quality pre-learning episode')
                                         self.env.sample_observations()
+                                        print(self.env.chquals)
                                         if self.env.reward_sig_qual_filter_status:
                                             self.env.ws_sf.send('display_text:1:SIGNAL OK')
                                             tocontinue=True
