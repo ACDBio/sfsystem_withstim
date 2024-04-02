@@ -785,13 +785,25 @@ def run_timer(n_intervals, reward_thresh, text, text_size):
     msg='display_text:'+str(text_size)+':'+text
     global env
     env.ws.send(msg)
+    if env.ws_np is not None:
+        if env.write_edf_ann==True:
+            anntxt=f'running timer'#f'current_overall_max_reward_{reward_val}_action_{actionstring}_inprev_{self.step_stim_length}_s'
+            env.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=env.delay)
     if reward_thresh==-1:
         env.step(env.default_actions)
         env.stop_audiovis_feedback()
         env.ws.send("turn_off_display")
         return [f'Timer signal has run {n_intervals} times']
     else:
-        obs=env.sample_and_process_observations_from_device()
+        if env.use_np:
+            tocont=False
+            while tocont==False:
+                obs=env.sample_and_process_observations_from_device() #only launch if signaal quality is ok
+                if env.np_reward_sig_qual_filter==True:
+                    tocont=True
+                    break
+        else:
+            obs=env.sample_and_process_observations_from_device()
         reward=env.get_reward(observations=obs, toreturn=True)
         if reward>reward_thresh:
             env.step(env.default_actions)
@@ -1076,6 +1088,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 send_np_signal_to_display=send_np_signal_to_display)
         time.sleep(5)    
 
+
                 #print(sd)
             #print(out_dict)
             #env.step(env.action_space.sample()) #sample step
@@ -1251,6 +1264,10 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
     if trigger_id=="run_timer":
         print('Timer is started')
         print(f'Timer query interval: {timer_interval_ms} ms')
+        if env.write_edf_ann:
+            env.start_edf_log()
+            print('EDF log started:')
+            print(env.edfpath)
         env.stop_audiovis_feedback()
         return b_invis, b_invis, b_invis, b_invis, b_invis, True, info_upd_interval, b_vis, 'run_timer', b_invis, b_vis, b_invis, b_invis, False, timer_interval_ms
     if trigger_id=="stop_timer":
