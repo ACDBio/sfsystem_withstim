@@ -360,7 +360,8 @@ class SFSystemCommunicator(gym.Env):
         neuroplay_thread = threading.Thread(target=self.run_neuroplay)
         neuroplay_thread.daemon = True
         neuroplay_thread.start()
-
+    def add_edf_log_text(self, text):
+        self.ws_np.send(f'AddLogItem?text={text}')
     def start_edf_log(self):
         self.ws_np.send(f'StartRecord?path={self.edfpath}')
         self.ws_np.recv()
@@ -818,6 +819,7 @@ class SFSystemCommunicator(gym.Env):
                 if self.ws_np is not None:
                     if self.write_edf_ann==True:
                         if self.edf_step_annotation==True:
+                            self.add_edf_log_text(text=f'episode_{self.current_episode}_step_{self.cur_step}_action_{actionstring}')
                             self.write_edf_annotation_fn(ann_text=f'episode_{self.current_episode}_step_{self.cur_step}', ann_duration_ms=self.step_stim_length_millis)
 
                 self.done=False
@@ -842,6 +844,7 @@ class SFSystemCommunicator(gym.Env):
                 if self.ws_np is not None:
                     if self.write_edf_ann==True:
                         if self.edf_step_annotation==True:
+                            self.add_edf_log_text(text=f'rewardstep_{np.round(reward_val,4)}_rewardcepisode_{np.round(self.total_cur_episode_reward,4)}')
                             anntxt=f'sr_{np.round(reward_val,4)}_tcer_{np.round(self.total_cur_episode_reward,4)}' #f'step_reward_{reward_val}_total_current_episode_reward_{self.total_cur_episode_reward}_action_{actionstring}'
                             self.write_edf_annotation_fn(ann_text=anntxt, ann_duration_ms=self.delay)
 
