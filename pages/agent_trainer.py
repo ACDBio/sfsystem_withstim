@@ -436,16 +436,19 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 'Session name: ',
                 dcc.Input(type='text', placeholder='Session name (old data, if present, will be overwritten)', value='default_session', id='session_name', size=30),]),
                 html.Button("Set session name to current timestamp", id="set_session_name_to_timestamp", style=b_vis, n_clicks=0),
+                ' ',
+                html.Button("Load session data to explore", id="load_session_data", style=b_vis, n_clicks=0),  
                 html.Br(),
                 dcc.Checklist(options=['Save actions on encoder hold'], value=['Save actions on encoder hold'], id='log_actions_on_hold'),
                 html.Br(),
-                dbc.Button("Show session data", id="open_plot_panel", n_clicks=0),    
+                dbc.Button("Show session data panel", id="open_plot_panel", n_clicks=0),  
                 dbc.Offcanvas(children=[html.Br(),
                  dbc.Row(justify="start", id='message_row', children=[]),
                   html.Div(id='training_figure_container', children=[]),
                   html.Br(),
                   html.Div(id='signal_figure_container', children=[]),
-                  html.Br(),],
+                  html.Br(),
+                  html.Div(id='signal_log_exploration_ctrl', children=[]),],
                   id='plot_panel',
                   title='Session data',
                   is_open=False,
@@ -535,7 +538,63 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                   ])]      
           
 )
-          ])                                        
+          ]) 
+
+channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',5:'np_C4',6:'np_P4',7:'np_O2',
+              8:'sf_ch1',9:'sf_ch2',10:'sf_ch3',11:'sf_ch4',12:'sf_ch5',13:'sf_ch6',14:'sf_ch7',15:'sf_ch8',16:'sf_enc'}
+signal_log_exploration_controls=[
+    dcc.RangeSlider(id='log_range_slider',min=0, max=1, step=1, marks=None, value=[0, 1], tooltip={"placement": "bottom", "always_visible": True, "template": "Timestep {value}"}),
+    html.Br(),
+    'Interval for history plot calculations: ',
+    dcc.Input(type='number', placeholder='1,2,3 etc.', value=500, id='log_intermedcalc_interval'),
+    html.Br(),
+    'Plot channels: ',
+    dcc.Dropdown(options=list(channel_spec.values()), value=list(channel_spec.values()), id='logchs', multi=True), 
+    html.Br(),
+    'Fft frequency bindings ',
+    html.Br(),
+    'Min: ',
+    dcc.Input(type='number', placeholder='1,2,3 etc.', value=2, id='minfft'),
+    ' ',
+    'Max: ',
+    dcc.Input(type='number', placeholder='1,2,3 etc.', value=50, id='maxfft'),
+    html.Br(),
+    'Datapoint id for display: ',
+    dcc.Input(type='text', placeholder='datapoint_id', value='', id='query_datapoint'),
+    ' ',
+    html.Button("Display data point info", id="datapoint_display_btn", style=b_vis, n_clicks=0),
+    html.Br(),
+    dcc.Textarea(
+    id='point_info',
+    value=' ',
+    style={'width': '100%', 'height': 150, 'font-size': '14px', 'line-height': '1'},
+    maxLength=2024, # Adjust the maxLength as needed
+    rows=32, # Adjust the number of rows as needed
+    cols=128, # Adjust the number of columns as needed
+    ),
+    html.Br(),
+    'New reward formula: ',
+    dcc.Input(type='text', placeholder='Formula string', value='raw_ch16', id='new_formula_string', size='50'),
+    html.Br(),
+    'Frequency bins to plot: ',
+    dcc.Input(type='text', placeholder='Bin values, Hz', value='1,4;4,8;8,14;14,35;35,50', id='fbins_toplot'),  
+    html.Br(),
+    html.Button("Plot data", id="replot_data_btn", style=b_vis, n_clicks=0),
+]
+
+@callback(
+    Output("open_plot_panel", "n_clicks"),
+    Output('signal_log_exploration_ctrl', "children"),
+    Input("load_session_data", "n_clicks"),
+    State("open_plot_panel", "n_clicks"),
+    prevent_initial_call=True
+)
+def explore_session_data_panel_formation(n1, n2):
+    return n2+1, signal_log_exploration_controls
+
+
+
+
 @callback(
     Output('action_text', "value"),
     Input("get_current_action", "n_clicks"),

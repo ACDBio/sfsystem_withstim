@@ -92,8 +92,8 @@ out_order=['lv1r','lv1g','lv1b','lv2r','lv2g','lv2b','lv3r','lv3g','lv3b','lv4r'
           'phasor_1_min','phasor_1_dif','phasor_2_freq','phasor_2_min','phasor_2_dif','maxivolume','wave_1_type','wave_2_type']
 
 
-channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',6:'np_C4',7:'np_P4',8:'np_O2',
-              9:'sf_ch1',10:'sf_ch2',11:'sf_ch3',12:'sf_ch4',13:'sf_ch5',14:'sf_ch6',15:'sf_ch7',16:'sf_ch8',17:'sf_enc'}
+channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',5:'np_C4',6:'np_P4',7:'np_O2',
+              8:'sf_ch1',9:'sf_ch2',10:'sf_ch3',11:'sf_ch4',12:'sf_ch5',13:'sf_ch6',14:'sf_ch7',15:'sf_ch8',16:'sf_enc'}
 
 
 
@@ -141,7 +141,8 @@ class SFSystemCommunicator(gym.Env):
                  text_size=1,
                  reward_np_sigqual_thresh=90,
                  basic_np_sigqual_thresh=80,
-                 send_np_signal_to_display=True):
+                 send_np_signal_to_display=True,
+                 offline_mode=False):
         
 
         self.reward_np_sigqual_thresh=reward_np_sigqual_thresh
@@ -166,9 +167,10 @@ class SFSystemCommunicator(gym.Env):
                 self.use_neuroplay=True
             if 'sf' in i:
                 self.use_sf=True
-        if self.use_neuroplay==True:
-            self.start_neuroplay()
-            time.sleep(10)
+        if not offline_mode:
+            if self.use_neuroplay==True:
+                self.start_neuroplay()
+                time.sleep(10)
         self.use_unfiltered_np_data=use_unfiltered_np_data
  
     
@@ -260,15 +262,17 @@ class SFSystemCommunicator(gym.Env):
         #self.init_action_space()
         #self.init_observation_space()
         #self.set_value_dict_for_reward_function()
-        self.connect()
-        self.set_delay_and_data_transfer_buffer_size()
+        if not offline_mode:
+            self.connect()
+            self.set_delay_and_data_transfer_buffer_size()
         self.set_fft_params()
         self.init_action_space()
         self.init_observation_space()
         self.set_value_dict_for_reward_function()
-        if self.only_pos_encoder_mode:
-            self.set_pos_encoder_mode()
-        print('Delay and data transfer buffer size are set up.')
+        if  not offline_mode:
+            if self.only_pos_encoder_mode:
+                self.set_pos_encoder_mode()
+            print('Delay and data transfer buffer size are set up.')
         self.set_default_actions()
         print('Default actions are set.')
 
@@ -292,7 +296,8 @@ class SFSystemCommunicator(gym.Env):
         self.current_episode=0
         self.set_fbin_x_axis_labels()
         
-        self.create_log()
+        if not offline_mode:
+            self.create_log()
         self.signal_plot_width=signal_plot_width
         self.signal_plot_height=signal_plot_height
         self.training_plot_width=training_plot_width
@@ -311,7 +316,8 @@ class SFSystemCommunicator(gym.Env):
         self.figures={'signal_fig':[],'training_fig':[]}
         self.colornames=color_names
         self.cur_action_log_no=0
-        self.get_np_sig_qual()
+        if not offline_mode:
+            self.get_np_sig_qual()
 
     def get_np_sig_qual(self):
         print('Sampling signal quality')
