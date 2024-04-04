@@ -785,9 +785,10 @@ def explore_session_data_panel_formation(n1, n2, sn):
     State('new_formula_string', "value"),
     State('fbins_toplot', 'value'),
     State('log_session_data', 'data'),
+    State('log_intermedcalc_interval', 'value'),
     prevent_initial_call=True
 )
-def explore_session_data_panel_formation(n1, drange, logchs, fftrange, nformulastring, nfbins, sdata):
+def explore_session_data_panel_formation(n1, drange, logchs, fftrange, nformulastring, nfbins, sdata, analysis_step):
     global log_env
     step_rewards=sdata['step_rewards']
     episode_total_rewards=sdata['episode_total_rewards']
@@ -846,7 +847,45 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, nformulas
     fig_heatmap_fft.update_layout(title='Heatmap of FFT Results')
     #fig_heatmap_fft.show()
 
-    return [dcc.Graph(figure=orig_reward_fig), dcc.Graph(figure=orig_episode_reward_fig)]+figs_raw_signal+figs_fft+[dcc.Graph(figure=fig_heatmap_fft)]
+    fig_heatmap_raw = go.Figure(data=go.Heatmap(z=raw_signal.T, y=log_env.all_input_channels, x=np.arange(raw_signal.shape[1])))
+    fig_heatmap_raw.update_layout(title='Heatmap of Raw Signal for All Channels')
+
+    bin_figs=[]
+    for chidx in range(len(log_env.all_input_channels)):
+        chbins=fbins_data[chidx]
+        fig = go.Figure(data=go.Bar(x=log_env.fbin_axis_labels, y=chbins, name=f'Channel {log_env.all_input_channels[chidx]} frequency bins'))
+        fig.update_layout(title=f'Signal Bins for {log_env.all_input_channels[chidx]}')
+        bin_figs.append(dcc.Graph(figure=fig))
+
+
+    #print('H0')
+    nbins=int(np.floor(crd.shape[0]/analysis_step))
+    databins=np.array_split(crd,nbins)
+    bin_vals_ns=[]
+    for nsraw in databins:
+        nsfft=log_env.get_fft_allchannels(nsraw)
+        nsfbins=log_env.get_bin_values_allchannels(nsfft)
+        bin_vals_ns.append(nsfbins)
+    #print('H1')
+    bin_vals_ns=np.array(bin_vals_ns)
+    figs_bin_values = []
+    print(bin_vals_ns.shape)
+    try:
+        for i in range(bin_vals_ns.shape[1]):
+            print(i)
+            chbins=bin_vals_ns[:,i,:]
+            fig = go.Figure()
+            for z in range(chbins.shape[1]):
+                #print(chbins[:,z].shape)
+                #print(log_env.fbin_axis_labels)
+                #print(z)
+                fig.add_trace(go.Scatter(x=list(range(chbins.shape[0])), y=chbins[:, z], mode='lines', name=f'Bin {log_env.fbin_axis_labels[z]}'))
+            fig.update_layout(title=f'Bin Values for Channel {log_env.all_input_channels[i]} Over Time with step  {analysis_step}')
+            figs_bin_values.append(dcc.Graph(figure=fig))
+    except Exception as e:
+        print(e)
+
+    return [dcc.Graph(figure=orig_reward_fig), dcc.Graph(figure=orig_episode_reward_fig)]+figs_raw_signal+figs_fft+[dcc.Graph(figure=fig_heatmap_fft)]+[dcc.Graph(figure=fig_heatmap_raw)]+bin_figs+figs_bin_values
 
 
 
