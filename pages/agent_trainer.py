@@ -120,7 +120,8 @@ def copy_directory(src_dir, dest_dir):
     # Copy the directory and all its contents
     shutil.copytree(src_dir, dest_dir,  dirs_exist_ok = True)
 
-signal_log_exploration_controls=html.Div(id='signal_log_exploration_controls', children=[
+signal_log_exploration_controls=dbc.Container(id='signal_log_exploration_controls', children=[
+    dbc.Row(children=[dbc.Col(children=[
     html.Datalist(
             id='logpoints',
             children=[],
@@ -161,8 +162,10 @@ signal_log_exploration_controls=html.Div(id='signal_log_exploration_controls', c
     'Frequency bins to plot: ',
     dcc.Input(type='text', placeholder='Bin values, Hz', value='1,4;4,8;8,14;14,35;35,50', id='fbins_toplot'),  
     html.Br(),
-    html.Button("Update plots", id="replot_data_btn", style=b_vis, n_clicks=0),
-    html.Div(id='logplotcontainer', children=[])], style=invis)
+    html.Button("Update plots", id="replot_data_btn", style=b_vis, n_clicks=0),],width='auto')], justify="start"),
+    dbc.Row(
+    children=[
+    html.Div(id='logplotcontainer', children=[], style={'width':'100%'})])], style=invis, fluid=True)
 
 
 layout=html.Div(
@@ -472,6 +475,20 @@ layout=html.Div(
                ]),
              ])
 ]),
+dbc.Offcanvas(children=[html.Br(),
+    dbc.Row(justify="start", id='message_row', children=[]),
+    html.Div(id='training_figure_container', children=[]),
+    html.Br(),
+    html.Div(id='signal_figure_container', children=[]),
+    html.Br(),
+    html.Div(signal_log_exploration_controls, style={'width':'100%'}),],
+    id='plot_panel',
+    title='Session data',
+    is_open=False,
+    placement="end",
+    scrollable=True,
+    style={'width':'95%'},
+),
 dbc.Col(children=[dcc.Markdown("### Session Data"),
                  html.Div(id='plot_style_container', children=[
                 'CSS color names for the signal plots: ',
@@ -498,20 +515,20 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 dcc.Checklist(options=['Save actions on encoder hold'], value=['Save actions on encoder hold'], id='log_actions_on_hold'),
                 html.Br(),
                 dbc.Button("Show session data panel", id="open_plot_panel", n_clicks=0),  
-                dbc.Offcanvas(children=[html.Br(),
-                 dbc.Row(justify="start", id='message_row', children=[]),
-                  html.Div(id='training_figure_container', children=[]),
-                  html.Br(),
-                  html.Div(id='signal_figure_container', children=[]),
-                  html.Br(),
-                  signal_log_exploration_controls,],
-                  id='plot_panel',
-                  title='Session data',
-                  is_open=False,
-                  placement="end",
-                  scrollable=True,
-                  style={'width':'95%'},
-                ),
+                # dbc.Offcanvas(children=[html.Br(),
+                #  dbc.Row(justify="start", id='message_row', children=[]),
+                #   html.Div(id='training_figure_container', children=[]),
+                #   html.Br(),
+                #   html.Div(id='signal_figure_container', children=[]),
+                #   html.Br(),
+                #   html.Div(signal_log_exploration_controls, style={'width':'100%'}),],
+                #   id='plot_panel',
+                #   title='Session data',
+                #   is_open=False,
+                #   placement="end",
+                #   scrollable=True,
+                #   style={'width':'95%'},
+                # ),
                 html.Br(),
                 'Clear trainer results every N seconds: ',
                 dcc.Input(type='number', placeholder='Interval, s  (-1 for never)', value=-1, id='clear_trainer_data_n_seconds'), 
@@ -749,14 +766,14 @@ def explore_session_data_panel_formation(n1, n2, sn, nformstr, nfbins):
     for i in logdata['fbins']:
         fbinstr+=f'{i[0]},{i[1]};'
     fbinstr=fbinstr[:-1]
-    return vis,[],[],[], lrsmax, marks,  [0, lrsmax], logdata['n_timepoints_per_sample'], int(log_env.f_plot[-1]), [0, log_env.f_plot[-1]], opts, logdata, ['Original reward formula: '+logdata['reward_formula_string_orig'],
+    return vis,[],[],[], lrsmax, marks,  [0, lrsmax],1, int(log_env.f_plot[-1]), [0, log_env.f_plot[-1]], opts, logdata, ['Original reward formula: '+logdata['reward_formula_string_orig'],
                                                                                                                                                             html.Br(),
                                                                                                                                                             'Originally explored fbins: '+fbinstr,
                                                                                                                                                             html.Br(),
                                                                                                                                                             'Original n timepoints per sample: '+str(logdata['n_timepoints_per_sample'])] #, timesteps #logdata['n_timepoints_per_sample']
 
 #n2+1
-
+# logdata['n_timepoints_per_sample']
 
 # channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',5:'np_C4',6:'np_P4',7:'np_O2',
 #               8:'sf_ch1',9:'sf_ch2',10:'sf_ch3',11:'sf_ch4',12:'sf_ch5',13:'sf_ch6',14:'sf_ch7',15:'sf_ch8',16:'sf_enc'}
@@ -877,7 +894,7 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, sdata, an
         logchs_inds.append(log_env.all_input_channels.index(i))
 
 
-    print('H2')
+   # print('H2')
     new_rewards=[]
     print(crd.shape)
     nsteps=int(crd.shape[0]/log_env.n_timepoints_per_sample)
