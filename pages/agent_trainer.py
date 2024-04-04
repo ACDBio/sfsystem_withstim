@@ -928,7 +928,7 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, sdata, an
         cffts_filtered=cffts[:,startfftind:endfftind]
 
         raw_signal=crd
-        figs_raw_signal = []
+        figs_raw_signal = {}
         timepoints=rdf.datapoint.tolist()
         #print(raw_signal)
     # print(raw_signal.shape)
@@ -937,12 +937,13 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, sdata, an
             #print(i)
             fig = go.Figure(data=go.Scatter(x=timepoints, y=raw_signal[:, i], mode='lines'))
             fig.update_layout(title=f'Raw Signal for Channel {log_env.all_input_channels[i]}')
-            figs_raw_signal.append(dcc.Graph(figure=fig))
-        figs_fft = []
+            figs_raw_signal[log_env.all_input_channels[i]]=dcc.Graph(figure=fig)
+
+        figs_fft = {}
         for i in range(cffts_filtered.shape[0]):
             fig = go.Figure(data=go.Scatter(x=f_plot_cur, y=cffts_filtered[i], mode='lines'))
             fig.update_layout(title=f'FFT for Channel {log_env.all_input_channels[i]}')
-            figs_fft.append(dcc.Graph(figure=fig))
+            figs_fft[log_env.all_input_channels[i]]=dcc.Graph(figure=fig)
 
         print(cffts_filtered.shape)
         print(len(f_plot_cur[:-1]))
@@ -954,15 +955,15 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, sdata, an
         fig_heatmap_raw = go.Figure(data=go.Heatmap(z=raw_signal.T, y=log_env.all_input_channels, x=np.arange(raw_signal.shape[1])))
         fig_heatmap_raw.update_layout(title='Heatmap of Raw Signal for All Channels')
 
-        bin_figs=[]
+        bin_figs={}
         for chidx in range(len(log_env.all_input_channels)):
             chbins=fbins_data[chidx]
             fig = go.Figure(data=go.Bar(x=log_env.fbin_axis_labels, y=chbins, name=f'Channel {log_env.all_input_channels[chidx]} frequency bins'))
             fig.update_layout(title=f'Signal Bins for {log_env.all_input_channels[chidx]}')
-            bin_figs.append(dcc.Graph(figure=fig))
+            bin_figs[log_env.all_input_channels[chidx]]=dcc.Graph(figure=fig)
 
 
-        print('H0')
+        #print('H0')
         nbins=int(np.floor(crd.shape[0]/analysis_step))
         databins=np.array_split(crd,nbins)
         bin_vals_ns=[]
@@ -970,9 +971,9 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, sdata, an
             nsfft=log_env.get_fft_allchannels(nsraw)
             nsfbins=log_env.get_bin_values_allchannels(nsfft)
             bin_vals_ns.append(nsfbins)
-        print('H1')
+        #print('H1')
         bin_vals_ns=np.array(bin_vals_ns)
-        figs_bin_values = []
+        figs_bin_values = {}
         print(bin_vals_ns.shape)
         try:
             for i in range(bin_vals_ns.shape[1]):
@@ -985,16 +986,16 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, sdata, an
                     #print(z)
                     fig.add_trace(go.Scatter(x=list(range(chbins.shape[0])), y=chbins[:, z], mode='lines', name=f'Bin {log_env.fbin_axis_labels[z]}'))
                 fig.update_layout(title=f'Bin Values for Channel {log_env.all_input_channels[i]} Over Time with step  {analysis_step}')
-                figs_bin_values.append(dcc.Graph(figure=fig))
+                figs_bin_values[log_env.all_input_channels[i]]=dcc.Graph(figure=fig)
         except Exception as e:
             print(e)
-        figs_bin_heatmaps = []
+        figs_bin_heatmaps = {}
         try:
             for i in range(bin_vals_ns.shape[2]):
                 chbins=bin_vals_ns[:,:,i]
                 fig=go.Figure(data=go.Heatmap(z=chbins.T, x=list(range(chbins.shape[0])), y=log_env.all_input_channels))
                 fig.update_layout(title=f'Heatmap of Bin {log_env.fbin_axis_labels[i]} Results')
-                figs_bin_heatmaps.append(dcc.Graph(figure=fig))
+                figs_bin_heatmaps[log_env.fbin_axis_labels[i]]=dcc.Graph(figure=fig)
         except Exception as e:
             print(e)
         # print('H2')
@@ -1018,9 +1019,71 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, sdata, an
         #     new_reward_fig.update_layout(title=f'New step reward data')
         # except Exception as e:
         #     print(e)
+        print("H&&&")
+        col1=[]
+        col2=[]
+        mid=[]
+
+        if 'sf_enc' in figs_raw_signal:
+            mid.append(figs_raw_signal['sf_enc'])
+        if 'sf_enc' in figs_fft:
+            mid.append(figs_fft['sf_enc'])
+        if 'sf_enc' in bin_figs:
+            mid.append(bin_figs['sf_enc'])
+        if 'sf_enc' in figs_bin_values:
+            mid.append(figs_bin_values['sf_enc'])
+        if 'sf_enc' in figs_bin_heatmaps:
+            mid.append(figs_bin_heatmaps['sf_enc'])
+
+        for i in ['np_F3','np_C3','np_P3','np_O1', 'sf_ch1', 'sf_ch2', 'sf_ch3','sf_ch4']:
+            if i in figs_raw_signal:
+                col1.append(figs_raw_signal[i])
+        for i in ['np_F4','np_C4','np_P4','np_O2', 'sf_ch5', 'sf_ch6', 'sf_ch7', 'sf_ch8']:
+            if i in figs_raw_signal:
+                col2.append(figs_raw_signal[i])
+
+        for i in ['np_F3','np_C3','np_P3','np_O1', 'sf_ch1', 'sf_ch2', 'sf_ch3','sf_ch4']:
+            if i in figs_fft:
+                col1.append(figs_fft[i])
+        for i in ['np_F4','np_C4','np_P4','np_O2', 'sf_ch5', 'sf_ch6', 'sf_ch7', 'sf_ch8']:
+            if i in figs_fft:
+                col2.append(figs_fft[i])
+
+        for i in ['np_F3','np_C3','np_P3','np_O1', 'sf_ch1', 'sf_ch2', 'sf_ch3','sf_ch4']:
+            if i in bin_figs:
+                col1.append(bin_figs[i])
+        for i in ['np_F4','np_C4','np_P4','np_O2', 'sf_ch5', 'sf_ch6', 'sf_ch7', 'sf_ch8']:
+            if i in bin_figs:
+                col2.append(bin_figs[i])
+
+        for i in ['np_F3','np_C3','np_P3','np_O1', 'sf_ch1', 'sf_ch2', 'sf_ch3','sf_ch4']:
+            if i in figs_bin_values:
+                col1.append(figs_bin_values[i])
+        for i in ['np_F4','np_C4','np_P4','np_O2', 'sf_ch5', 'sf_ch6', 'sf_ch7', 'sf_ch8']:
+            if i in figs_bin_values:
+                col2.append(figs_bin_values[i])
+
+        for i in ['np_F3','np_C3','np_P3','np_O1', 'sf_ch1', 'sf_ch2', 'sf_ch3','sf_ch4']:
+            if i in figs_bin_heatmaps:
+                col1.append(figs_bin_heatmaps[i])
+        for i in ['np_F4','np_C4','np_P4','np_O2', 'sf_ch5', 'sf_ch6', 'sf_ch7', 'sf_ch8']:
+            if i in figs_bin_heatmaps:
+                col2.append(figs_bin_heatmaps[i])
+
+        res=[dbc.Row(children=[dcc.Graph(figure=orig_reward_fig),
+                           dcc.Graph(figure=orig_episode_reward_fig),
+                           dcc.Graph(figure=new_reward_fig),
+                           dcc.Graph(figure=fig_heatmap_fft),
+                           dcc.Graph(figure=fig_heatmap_raw)]+mid),
+        dbc.Row(children=[dbc.Col(children=col1),dbc.Col(children=col2)])]
     except Exception as e:
         print(e)
-    return [dcc.Graph(figure=orig_reward_fig), dcc.Graph(figure=orig_episode_reward_fig)]+[dcc.Graph(figure=new_reward_fig)]+figs_raw_signal+figs_fft+[dcc.Graph(figure=fig_heatmap_fft)]+[dcc.Graph(figure=fig_heatmap_raw)]+bin_figs+figs_bin_values+figs_bin_heatmaps
+    #figs_raw_signal
+    #figs_fft
+    #bin_figs
+    #figs_bin_values
+    #figs_bin_heatmaps
+    return res #[dcc.Graph(figure=orig_reward_fig), dcc.Graph(figure=orig_episode_reward_fig)]+[dcc.Graph(figure=new_reward_fig)]+figs_raw_signal+figs_fft+[dcc.Graph(figure=fig_heatmap_fft)]+[dcc.Graph(figure=fig_heatmap_raw)]+bin_figs+figs_bin_values+figs_bin_heatmaps
 
 
 
