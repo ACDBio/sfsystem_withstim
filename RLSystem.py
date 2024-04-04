@@ -18,6 +18,7 @@ import threading
 import shutil
 plotly.io.json.config.default_engine = 'orjson'
 websocket.enableTrace(False)
+from datetime import datetime
 #if smaple_obsevarions() stuck - restart the esp32 (not by button, but by getting usb oord in-out)
 
 # use_neuroplay=True
@@ -321,8 +322,21 @@ class SFSystemCommunicator(gym.Env):
 
     def get_np_sig_qual(self):
         print('Sampling signal quality')
-        self.ws_np.send('CurrentDeviceInfo')
-        devinfo=json.loads(self.ws_np.recv())
+        sqdone=False
+        while sqdone==False:
+            try:
+                self.ws_np.send('CurrentDeviceInfo')
+                devinfo=json.loads(self.ws_np.recv())
+                print(devinfo)
+                if "currentChannelsNames" in str(devinfo):
+                    sqdone=True
+                    break
+            except Exception as e:
+                print(e)
+                if self.ws_np.sock is None:
+                    print('Socket closed. Breaking.')
+                    return True
+                    break
         chnames=devinfo["currentChannelsNames"]
         quals=devinfo["quality"]
         res={}
@@ -348,6 +362,7 @@ class SFSystemCommunicator(gym.Env):
         return res
     
     def np_basic_sig_qual_filter(self, thresh=None):
+        print('Basic sig quality filter assessment')
         if str(thresh)=='None':
             if str(self.reward_np_sigqual_thresh)!='None':
                 thresh=self.basic_np_sigqual_thresh
@@ -370,6 +385,7 @@ class SFSystemCommunicator(gym.Env):
         self.ws_np.send(f'AddLogItem?text={text}')
     def start_edf_log(self):
         self.ws_np.send(f'StartRecord?path={self.edfpath}')
+        time.sleep(1)
         self.ws_np.recv()
     
     def stop_edf_log(self):
@@ -711,6 +727,27 @@ class SFSystemCommunicator(gym.Env):
         #except:
             #raise CustomExceptionWithDetails("Unable to sample", "")
     
+    def sample_fromnp(self):
+        np_unsampled=True
+        if self.ws_np.connected:
+            while np_unsampled:
+                try:
+                    if self.use_unfiltered_np_data==True:
+                        self.ws_np.send('grabRawData')
+                    else:
+                        self.ws_np.send('grabFilteredData')
+                    print('Sampling NP signal')
+                    self.current_sample_np=np.array(json.loads(self.ws_np.recv())['data'])
+                    np_unsampled=False
+                    break
+                except Exception as e:
+                    print('HERE')
+                    print(e)
+                    if not self.ws_np.connected:
+                        print('No connection')
+                        return True
+        return True 
+
     def sample_observations(self, use_synth_data=False): #True for testing of fft etc., False - for actual application
 
         if self.ws_np is not None:
@@ -728,18 +765,24 @@ class SFSystemCommunicator(gym.Env):
         self.raw_data=[]
         # np_unsampled=True
         if self.use_neuroplay==True:
-        #     while np_unsampled:
-            try:
-                if self.use_unfiltered_np_data==True:
-                    self.ws_np.send('grabRawData')
-                else:
-                    self.ws_np.send('grabFilteredData')
-                self.current_sample_np=np.array(json.loads(self.ws_np.recv())['data'])
-                #np_unsampled=False
-            except Exception as e:
-                print(e)
-                return False
-
+            # np_unsampled=True
+            # while np_unsampled:
+            #     try:
+            #         if self.use_unfiltered_np_data==True:
+            #             self.ws_np.send('grabRawData')
+            #         else:
+            #             self.ws_np.send('grabFilteredData')
+            #         print('Sampling NP signal')
+            #         self.current_sample_np=np.array(json.loads(self.ws_np.recv())['data'])
+            #         np_unsampled=False
+            #         break
+            #     except Exception as e:
+            #         print(e)
+            #       #  return False
+            np_thread = threading.Thread(target=self.sample_fromnp)
+            np_thread.daemon = True
+            np_thread.start()
+            np_thread.join()
         else:
             self.current_sample_np=np.zeros(shape=(8,1250))
         for i in self.current_sample_np:
@@ -825,7 +868,9 @@ class SFSystemCommunicator(gym.Env):
                 if self.ws_np is not None:
                     if self.write_edf_ann==True:
                         if self.edf_step_annotation==True:
-                            self.add_edf_log_text(text=f'episode_{self.current_episode}_step_{self.cur_step}_action_{actionstring}')
+                            now = datetime.now()
+                            formatted_now = now.strftime("%d:%m:%Y_%H:%M:%S")                            
+                            self.add_edf_log_text(text=f'episode_{self.current_episode}_step_{self.cur_step}_timestamp_{formatted_now}_action_{actionstring}')
                             self.write_edf_annotation_fn(ann_text=f'episode_{self.current_episode}_step_{self.cur_step}', ann_duration_ms=self.step_stim_length_millis)
 
                 self.done=False
@@ -889,7 +934,10 @@ class SFSystemCommunicator(gym.Env):
                 if self.collect_data_toplot:
                     self.cur_episode_rewards.append(reward_val)
                 if self.log_steps:
-                    self.write_tolog(json.dumps({'Episode':self.current_episode, 'Step': self.cur_step, 'Step reward': reward_val}))
+                    now = datetime.now()
+                    # Format the date and time
+                    formatted_now = now.strftime("%d:%m:%Y_%H:%M:%S")
+                    self.write_tolog(json.dumps({'Timestamp':f'{formatted_now}','Episode':self.current_episode, 'Step': self.cur_step, 'Step reward': reward_val}))
                     if self.ws_np is not None:
                         self.write_tolog(json.dumps({'NP chqual':self.chquals, 'NP reward qual filter status':self.reward_sig_qual_filter_status, 'NP reward sig qual filter thresh': self.reward_np_sigqual_thresh}))
 
@@ -950,7 +998,10 @@ class SFSystemCommunicator(gym.Env):
                     self.previous_episodes_total_rewards.append(self.total_cur_episode_reward)
                     self.previous_episodes_max_rewards.append(self.episode_max_reward)
                 if self.log_episodes:
-                    self.write_tolog(json.dumps({'Episode':self.current_episode, 'Episode total reward': self.total_cur_episode_reward, 'Episode max reward': self.episode_max_reward}))
+                    now = datetime.now()
+                    # Format the date and time
+                    formatted_now = now.strftime("%d:%m:%Y_%H:%M:%S")
+                    self.write_tolog(json.dumps({'Timestamp':f'{formatted_now}','Episode':self.current_episode, 'Episode total reward': self.total_cur_episode_reward, 'Episode max reward': self.episode_max_reward}))
                 if self.log_best_actions_every_episode:
                     actionstring=self.get_json_string_from_ordered_dict(self.best_action_episode)
                     self.write_tolog(json.dumps({'Best action in the episode reward':self.episode_max_reward}))
