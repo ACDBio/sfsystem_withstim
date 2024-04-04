@@ -872,84 +872,12 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, sdata, an
    
     crd=rdf.iloc[startind:endind]
     crd=crd.to_numpy()[:,6:-1]
-
-    cffts=log_env.get_fft_allchannels(crd)
-
-    #print(cffts.shape)
-    fbins_data=log_env.get_bin_values_allchannels(cffts)
-    cffts_filtered=cffts[:,startfftind:endfftind]
-
-    raw_signal=crd
-    figs_raw_signal = []
-    timepoints=rdf.datapoint.tolist()
-    #print(raw_signal)
-   # print(raw_signal.shape)
-    print(log_env.all_input_channels)
-    for i in range(raw_signal.shape[1]):
-        #print(i)
-        fig = go.Figure(data=go.Scatter(x=timepoints, y=raw_signal[:, i], mode='lines'))
-        fig.update_layout(title=f'Raw Signal for Channel {log_env.all_input_channels[i]}')
-        figs_raw_signal.append(dcc.Graph(figure=fig))
-    figs_fft = []
-    for i in range(cffts_filtered.shape[0]):
-        fig = go.Figure(data=go.Scatter(x=f_plot_cur, y=cffts_filtered[i], mode='lines'))
-        fig.update_layout(title=f'FFT for Channel {log_env.all_input_channels[i]}')
-        figs_fft.append(dcc.Graph(figure=fig))
-
-    print(cffts_filtered.shape)
-    print(len(f_plot_cur[:-1]))
-    print(log_env.all_input_channels)
-    fig_heatmap_fft = go.Figure(data=go.Heatmap(z=cffts_filtered, x=f_plot_cur[:-1], y=log_env.all_input_channels))
-    fig_heatmap_fft.update_layout(title='Heatmap of FFT Results')
-    #fig_heatmap_fft.show()
-
-    fig_heatmap_raw = go.Figure(data=go.Heatmap(z=raw_signal.T, y=log_env.all_input_channels, x=np.arange(raw_signal.shape[1])))
-    fig_heatmap_raw.update_layout(title='Heatmap of Raw Signal for All Channels')
-
-    bin_figs=[]
-    for chidx in range(len(log_env.all_input_channels)):
-        chbins=fbins_data[chidx]
-        fig = go.Figure(data=go.Bar(x=log_env.fbin_axis_labels, y=chbins, name=f'Channel {log_env.all_input_channels[chidx]} frequency bins'))
-        fig.update_layout(title=f'Signal Bins for {log_env.all_input_channels[chidx]}')
-        bin_figs.append(dcc.Graph(figure=fig))
+    logchs_inds=[]
+    for i in logchs:
+        logchs_inds.append(log_env.all_input_channels.index(i))
 
 
-    #print('H0')
-    nbins=int(np.floor(crd.shape[0]/analysis_step))
-    databins=np.array_split(crd,nbins)
-    bin_vals_ns=[]
-    for nsraw in databins:
-        nsfft=log_env.get_fft_allchannels(nsraw)
-        nsfbins=log_env.get_bin_values_allchannels(nsfft)
-        bin_vals_ns.append(nsfbins)
-    #print('H1')
-    bin_vals_ns=np.array(bin_vals_ns)
-    figs_bin_values = []
-    print(bin_vals_ns.shape)
-    try:
-        for i in range(bin_vals_ns.shape[1]):
-            #print(i)
-            chbins=bin_vals_ns[:,i,:]
-            fig = go.Figure()
-            for z in range(chbins.shape[1]):
-                #print(chbins[:,z].shape)
-                #print(log_env.fbin_axis_labels)
-                #print(z)
-                fig.add_trace(go.Scatter(x=list(range(chbins.shape[0])), y=chbins[:, z], mode='lines', name=f'Bin {log_env.fbin_axis_labels[z]}'))
-            fig.update_layout(title=f'Bin Values for Channel {log_env.all_input_channels[i]} Over Time with step  {analysis_step}')
-            figs_bin_values.append(dcc.Graph(figure=fig))
-    except Exception as e:
-        print(e)
-    figs_bin_heatmaps = []
-    try:
-        for i in range(bin_vals_ns.shape[2]):
-            chbins=bin_vals_ns[:,:,i]
-            fig=go.Figure(data=go.Heatmap(z=chbins.T, x=list(range(chbins.shape[0])), y=log_env.all_input_channels))
-            fig.update_layout(title=f'Heatmap of Bin {log_env.fbin_axis_labels[i]} Results')
-            figs_bin_heatmaps.append(dcc.Graph(figure=fig))
-    except Exception as e:
-        print(e)
-
+    print('H2')
     new_rewards=[]
     print(crd.shape)
     nsteps=int(crd.shape[0]/log_env.n_timepoints_per_sample)
@@ -970,7 +898,112 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, sdata, an
         new_reward_fig.update_layout(title=f'New step reward data')
     except Exception as e:
         print(e)
-    return [dcc.Graph(figure=orig_reward_fig), dcc.Graph(figure=orig_episode_reward_fig)]+figs_raw_signal+figs_fft+[dcc.Graph(figure=fig_heatmap_fft)]+[dcc.Graph(figure=fig_heatmap_raw)]+bin_figs+figs_bin_values+figs_bin_heatmaps+[dcc.Graph(figure=new_reward_fig)]
+
+    crd=crd[:,logchs_inds]
+    log_env.all_input_channels=logchs
+    try:
+
+
+        cffts=log_env.get_fft_allchannels(crd)
+
+        #print(cffts.shape)
+        fbins_data=log_env.get_bin_values_allchannels(cffts)
+        cffts_filtered=cffts[:,startfftind:endfftind]
+
+        raw_signal=crd
+        figs_raw_signal = []
+        timepoints=rdf.datapoint.tolist()
+        #print(raw_signal)
+    # print(raw_signal.shape)
+        print(log_env.all_input_channels)
+        for i in range(raw_signal.shape[1]):
+            #print(i)
+            fig = go.Figure(data=go.Scatter(x=timepoints, y=raw_signal[:, i], mode='lines'))
+            fig.update_layout(title=f'Raw Signal for Channel {log_env.all_input_channels[i]}')
+            figs_raw_signal.append(dcc.Graph(figure=fig))
+        figs_fft = []
+        for i in range(cffts_filtered.shape[0]):
+            fig = go.Figure(data=go.Scatter(x=f_plot_cur, y=cffts_filtered[i], mode='lines'))
+            fig.update_layout(title=f'FFT for Channel {log_env.all_input_channels[i]}')
+            figs_fft.append(dcc.Graph(figure=fig))
+
+        print(cffts_filtered.shape)
+        print(len(f_plot_cur[:-1]))
+        print(log_env.all_input_channels)
+        fig_heatmap_fft = go.Figure(data=go.Heatmap(z=cffts_filtered, x=f_plot_cur[:-1], y=log_env.all_input_channels))
+        fig_heatmap_fft.update_layout(title='Heatmap of FFT Results')
+        #fig_heatmap_fft.show()
+
+        fig_heatmap_raw = go.Figure(data=go.Heatmap(z=raw_signal.T, y=log_env.all_input_channels, x=np.arange(raw_signal.shape[1])))
+        fig_heatmap_raw.update_layout(title='Heatmap of Raw Signal for All Channels')
+
+        bin_figs=[]
+        for chidx in range(len(log_env.all_input_channels)):
+            chbins=fbins_data[chidx]
+            fig = go.Figure(data=go.Bar(x=log_env.fbin_axis_labels, y=chbins, name=f'Channel {log_env.all_input_channels[chidx]} frequency bins'))
+            fig.update_layout(title=f'Signal Bins for {log_env.all_input_channels[chidx]}')
+            bin_figs.append(dcc.Graph(figure=fig))
+
+
+        print('H0')
+        nbins=int(np.floor(crd.shape[0]/analysis_step))
+        databins=np.array_split(crd,nbins)
+        bin_vals_ns=[]
+        for nsraw in databins:
+            nsfft=log_env.get_fft_allchannels(nsraw)
+            nsfbins=log_env.get_bin_values_allchannels(nsfft)
+            bin_vals_ns.append(nsfbins)
+        print('H1')
+        bin_vals_ns=np.array(bin_vals_ns)
+        figs_bin_values = []
+        print(bin_vals_ns.shape)
+        try:
+            for i in range(bin_vals_ns.shape[1]):
+                #print(i)
+                chbins=bin_vals_ns[:,i,:]
+                fig = go.Figure()
+                for z in range(chbins.shape[1]):
+                    #print(chbins[:,z].shape)
+                    #print(log_env.fbin_axis_labels)
+                    #print(z)
+                    fig.add_trace(go.Scatter(x=list(range(chbins.shape[0])), y=chbins[:, z], mode='lines', name=f'Bin {log_env.fbin_axis_labels[z]}'))
+                fig.update_layout(title=f'Bin Values for Channel {log_env.all_input_channels[i]} Over Time with step  {analysis_step}')
+                figs_bin_values.append(dcc.Graph(figure=fig))
+        except Exception as e:
+            print(e)
+        figs_bin_heatmaps = []
+        try:
+            for i in range(bin_vals_ns.shape[2]):
+                chbins=bin_vals_ns[:,:,i]
+                fig=go.Figure(data=go.Heatmap(z=chbins.T, x=list(range(chbins.shape[0])), y=log_env.all_input_channels))
+                fig.update_layout(title=f'Heatmap of Bin {log_env.fbin_axis_labels[i]} Results')
+                figs_bin_heatmaps.append(dcc.Graph(figure=fig))
+        except Exception as e:
+            print(e)
+        # print('H2')
+        # new_rewards=[]
+        # print(crd.shape)
+        # nsteps=int(crd.shape[0]/log_env.n_timepoints_per_sample)
+        # origdatasplit=np.array_split(crd,nsteps)
+        # try:
+        #     for i in origdatasplit:
+        #         print('h')
+        #         print(i.shape)
+        #         nobs={}
+        #         nobs['raw_data']=i #[:,log_env.channels_of_interest_inds]
+        #         nobs['fft']=log_env.get_fft_allchannels(nobs['raw_data'])
+        #         nobs['fbins']=log_env.get_bin_values_allchannels(nobs['fft'])
+        #         rev=log_env.get_reward(nobs, toreturn=True)
+        #         new_rewards.append(rev)
+        #     print(len(step_rewards.keys()))
+        #     print(len(new_rewards))
+        #     new_reward_fig=go.Figure(data=go.Scatter(x=list(step_rewards.keys()), y=new_rewards, mode='lines+markers'))
+        #     new_reward_fig.update_layout(title=f'New step reward data')
+        # except Exception as e:
+        #     print(e)
+    except Exception as e:
+        print(e)
+    return [dcc.Graph(figure=orig_reward_fig), dcc.Graph(figure=orig_episode_reward_fig)]+[dcc.Graph(figure=new_reward_fig)]+figs_raw_signal+figs_fft+[dcc.Graph(figure=fig_heatmap_fft)]+[dcc.Graph(figure=fig_heatmap_raw)]+bin_figs+figs_bin_values+figs_bin_heatmaps
 
 
 
@@ -1268,6 +1301,7 @@ def run_timer(n_intervals, reward_thresh, text, text_size):
 @callback(Output('training_figure_container', "children"),
           Output('signal_figure_container', "children"),
           Output('message_row', 'children', allow_duplicate=True),
+          Output('signal_log_exploration_controls', "style", allow_duplicate=True),
           Input('training_status_update', 'n_intervals'),
           State('run_type', 'data'),
           prevent_initial_call=True)
@@ -1304,7 +1338,7 @@ def collect_settings(n_intervals, runtype):
                     f'Training completion: {trainer.training_completed}']   
         else:
             messages=['Training not launched yet.']         
-    return training_fig, signal_fig, messages
+    return training_fig, signal_fig, messages, invis
 
 
 
