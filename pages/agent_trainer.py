@@ -121,7 +121,10 @@ def copy_directory(src_dir, dest_dir):
     shutil.copytree(src_dir, dest_dir,  dirs_exist_ok = True)
 
 signal_log_exploration_controls=dbc.Container(id='signal_log_exploration_controls', children=[
-    dbc.Row(children=[dbc.Col(children=[
+
+
+
+    dbc.Row(children=[html.Div(children=[
     html.Datalist(
             id='logpoints',
             children=[],
@@ -162,7 +165,10 @@ signal_log_exploration_controls=dbc.Container(id='signal_log_exploration_control
     'Frequency bins to plot: ',
     dcc.Input(type='text', placeholder='Bin values, Hz', value='1,4;4,8;8,14;14,35;35,50', id='fbins_toplot'),  
     html.Br(),
-    html.Button("Update plots", id="replot_data_btn", style=b_vis, n_clicks=0),],width='auto')], justify="start"),
+    html.Button("Update plots", id="replot_data_btn", style=b_vis, n_clicks=0),],style={'width':'100%'})], justify="start"),
+   
+   
+   
     dbc.Row(
     children=[
     html.Div(id='logplotcontainer', children=[], style={'width':'100%'})])], style=invis, fluid=True)
