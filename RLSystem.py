@@ -741,7 +741,7 @@ class SFSystemCommunicator(gym.Env):
                     np_unsampled=False
                     break
                 except Exception as e:
-                    print('HERE')
+                    #print('HERE')
                     print(e)
                     if not self.ws_np.connected:
                         print('No connection')
@@ -1240,6 +1240,8 @@ class stable_baselines_model_trainer():
         self.max_test_reward=0
         self.logfn=logfn
         self.collect_environment_data()
+        if (self.env.log_steps==True) or (self.env.log_episodes==True):
+            self.env.write_tolog(json.dumps(self.env_data))
         self.cur_episode_no=None
         self.stat1=None
         self.stat2=None
