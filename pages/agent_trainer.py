@@ -872,7 +872,7 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, nformulas
     print(bin_vals_ns.shape)
     try:
         for i in range(bin_vals_ns.shape[1]):
-            print(i)
+            #print(i)
             chbins=bin_vals_ns[:,i,:]
             fig = go.Figure()
             for z in range(chbins.shape[1]):
@@ -884,8 +884,37 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, nformulas
             figs_bin_values.append(dcc.Graph(figure=fig))
     except Exception as e:
         print(e)
+    figs_bin_heatmaps = []
+    try:
+        for i in range(bin_vals_ns.shape[2]):
+            chbins=bin_vals_ns[:,:,i]
+            fig=go.Figure(data=go.Heatmap(z=chbins.T, x=list(range(chbins.shape[0])), y=log_env.all_input_channels))
+            fig.update_layout(title=f'Heatmap of Bin {log_env.fbin_axis_labels[i]} Results')
+            figs_bin_heatmaps.append(dcc.Graph(figure=fig))
+    except Exception as e:
+        print(e)
 
-    return [dcc.Graph(figure=orig_reward_fig), dcc.Graph(figure=orig_episode_reward_fig)]+figs_raw_signal+figs_fft+[dcc.Graph(figure=fig_heatmap_fft)]+[dcc.Graph(figure=fig_heatmap_raw)]+bin_figs+figs_bin_values
+    new_rewards=[]
+    print(crd.shape)
+    nsteps=int(crd.shape[0]/log_env.n_timepoints_per_sample)
+    origdatasplit=np.array_split(crd,nsteps)
+    try:
+        for i in origdatasplit:
+            print('h')
+            print(i.shape)
+            nobs={}
+            nobs['raw_data']=i #[:,log_env.channels_of_interest_inds]
+            nobs['fft']=log_env.get_fft_allchannels(nobs['raw_data'])
+            nobs['fbins']=log_env.get_bin_values_allchannels(nobs['fft'])
+            rev=log_env.get_reward(nobs, toreturn=True)
+            new_rewards.append(rev)
+        print(len(step_rewards.keys()))
+        print(len(new_rewards))
+        new_reward_fig=go.Figure(data=go.Scatter(x=list(step_rewards.keys()), y=new_rewards, mode='lines+markers'))
+        new_reward_fig.update_layout(title=f'New step reward data')
+    except Exception as e:
+        print(e)
+    return [dcc.Graph(figure=orig_reward_fig), dcc.Graph(figure=orig_episode_reward_fig)]+figs_raw_signal+figs_fft+[dcc.Graph(figure=fig_heatmap_fft)]+[dcc.Graph(figure=fig_heatmap_raw)]+bin_figs+figs_bin_values+figs_bin_heatmaps+[dcc.Graph(figure=new_reward_fig)]
 
 
 
