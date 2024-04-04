@@ -14,6 +14,12 @@ from datetime import datetime
 import time
 import pandas as pd
 import  numpy as np
+import plotly.graph_objects as go
+import plotly.io as pio
+pio.templates.default = 'simple_white'
+
+
+
 channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',5:'np_C4',6:'np_P4',7:'np_O2',
               8:'sf_ch1',9:'sf_ch2',10:'sf_ch3',11:'sf_ch4',12:'sf_ch5',13:'sf_ch6',14:'sf_ch7',15:'sf_ch8',16:'sf_enc'}
 
@@ -153,7 +159,8 @@ signal_log_exploration_controls=html.Div(id='signal_log_exploration_controls', c
     'Frequency bins to plot: ',
     dcc.Input(type='text', placeholder='Bin values, Hz', value='1,4;4,8;8,14;14,35;35,50', id='fbins_toplot'),  
     html.Br(),
-    html.Button("Update plots", id="replot_data_btn", style=b_vis, n_clicks=0)], style=invis)
+    html.Button("Update plots", id="replot_data_btn", style=b_vis, n_clicks=0),
+    html.Div(id='logplotcontainer', children=[])], style=invis)
 
 
 layout=html.Div(
@@ -587,44 +594,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
 )
           ]) 
 
-# channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',5:'np_C4',6:'np_P4',7:'np_O2',
-#               8:'sf_ch1',9:'sf_ch2',10:'sf_ch3',11:'sf_ch4',12:'sf_ch5',13:'sf_ch6',14:'sf_ch7',15:'sf_ch8',16:'sf_enc'}
-# signal_log_exploration_controls=[html.Div(
-#     dcc.Store(id='log_session_data',data=None),
-#     dcc.RangeSlider(id='log_range_slider',min=0, max=1, step=1, marks=None, value=[0, 1], tooltip={"placement": "bottom", "always_visible": True, "template": "Timestep {value}"}),
-#     html.Br(),
-#     'Interval for history plot calculations: ',
-#     dcc.Input(type='number', placeholder='1,2,3 etc.', value=500, id='log_intermedcalc_interval'),
-#     html.Br(),
-#     'Plot channels: ',
-#     dcc.Dropdown(options=list(channel_spec.values()), value=list(channel_spec.values()), id='logchs', multi=True), 
-#     html.Br(),
-#     'Fft frequency bindings ',
-#     html.Br(),
-#     dcc.RangeSlider(id='fft_range_slider',min=0, max=50, step=1, marks=None, value=[0, 1], tooltip={"placement": "bottom", "always_visible": True, "template": "{value} Hz"}),
-#     html.Br(),
-#     'Datapoint id for display: ',
-#     dcc.Input(type='text', placeholder='datapoint_id', value='', id='query_datapoint'),
-#     ' ',
-#     html.Button("Display data point info", id="datapoint_display_btn", style=b_vis, n_clicks=0),
-#     html.Br(),
-#     dcc.Textarea(
-#     id='point_info',
-#     value=' ',
-#     style={'width': '100%', 'height': 150, 'font-size': '14px', 'line-height': '1'},
-#     maxLength=2024, # Adjust the maxLength as needed
-#     rows=32, # Adjust the number of rows as needed
-#     cols=128, # Adjust the number of columns as needed
-#     ),
-#     html.Br(),
-#     'New reward formula: ',
-#     dcc.Input(type='text', placeholder='Formula string', value='raw_ch16', id='new_formula_string', size='50'),
-#     html.Br(),
-#     'Frequency bins to plot: ',
-#     dcc.Input(type='text', placeholder='Bin values, Hz', value='1,4;4,8;8,14;14,35;35,50', id='fbins_toplot'),  
-#     html.Br(),
-#     html.Button("Update plots", id="replot_data_btn", style=b_vis, n_clicks=0), style=invis)
-# ]
+
 
 
 def process_sfs_mainlog(logf):
@@ -722,6 +692,7 @@ def process_sfs_mainlog(logf):
     Output('fft_range_slider', 'max'),
     Output('fft_range_slider', 'value'),
     Output('logpoints', 'children'),
+    Output('log_session_data', 'data'),
 
 
     Input("load_session_data", "n_clicks"),
@@ -734,7 +705,7 @@ def explore_session_data_panel_formation(n1, n2, sn):
     logdata=process_sfs_mainlog(logf)
     timesteps=logdata['rdf']['datapoint'].tolist()
     print(len(timesteps))
-    lrsmax=len(timesteps)-1
+    lrsmax=len(timesteps)
     dpts=logdata['rdf']['datapoint'].tolist()
     marks={}
     nts=len(timesteps)/(logdata['n_timepoints_per_sample'])
@@ -758,11 +729,95 @@ def explore_session_data_panel_formation(n1, n2, sn):
         opts.append(html.Option(label=i, value=i))
 
 
-
-    
-    return vis,[],[],[], lrsmax, marks,  [0, lrsmax], 1, log_env.f_plot[-1], [0, log_env.f_plot[-1]], opts #, timesteps #logdata['n_timepoints_per_sample']
+    logdata['rdf']=logdata['rdf'].to_json(orient='records')
+    return vis,[],[],[], lrsmax, marks,  [0, lrsmax], logdata['n_timepoints_per_sample'], log_env.f_plot[-1], [0, log_env.f_plot[-1]], opts, logdata #, timesteps #logdata['n_timepoints_per_sample']
 
 #n2+1
+
+
+# channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',5:'np_C4',6:'np_P4',7:'np_O2',
+#               8:'sf_ch1',9:'sf_ch2',10:'sf_ch3',11:'sf_ch4',12:'sf_ch5',13:'sf_ch6',14:'sf_ch7',15:'sf_ch8',16:'sf_enc'}
+# signal_log_exploration_controls=[html.Div(
+#     dcc.Store(id='log_session_data',data=None),
+#     dcc.RangeSlider(id='log_range_slider',min=0, max=1, step=1, marks=None, value=[0, 1], tooltip={"placement": "bottom", "always_visible": True, "template": "Timestep {value}"}),
+#     html.Br(),
+#     'Interval for history plot calculations: ',
+#     dcc.Input(type='number', placeholder='1,2,3 etc.', value=500, id='log_intermedcalc_interval'),
+#     html.Br(),
+#     'Plot channels: ',
+#     dcc.Dropdown(options=list(channel_spec.values()), value=list(channel_spec.values()), id='logchs', multi=True), 
+#     html.Br(),
+#     'Fft frequency bindings ',
+#     html.Br(),
+#     dcc.RangeSlider(id='fft_range_slider',min=0, max=50, step=1, marks=None, value=[0, 1], tooltip={"placement": "bottom", "always_visible": True, "template": "{value} Hz"}),
+#     html.Br(),
+#     'Datapoint id for display: ',
+#     dcc.Input(type='text', placeholder='datapoint_id', value='', id='query_datapoint'),
+#     ' ',
+#     html.Button("Display data point info", id="datapoint_display_btn", style=b_vis, n_clicks=0),
+#     html.Br(),
+#     dcc.Textarea(
+#     id='point_info',
+#     value=' ',
+#     style={'width': '100%', 'height': 150, 'font-size': '14px', 'line-height': '1'},
+#     maxLength=2024, # Adjust the maxLength as needed
+#     rows=32, # Adjust the number of rows as needed
+#     cols=128, # Adjust the number of columns as needed
+#     ),
+#     html.Br(),
+#     'New reward formula: ',
+#     dcc.Input(type='text', placeholder='Formula string', value='raw_ch16', id='new_formula_string', size='50'),
+#     html.Br(),
+#     'Frequency bins to plot: ',
+#     dcc.Input(type='text', placeholder='Bin values, Hz', value='1,4;4,8;8,14;14,35;35,50', id='fbins_toplot'),  
+#     html.Br(),
+#     html.Button("Update plots", id="replot_data_btn", style=b_vis, n_clicks=0), style=invis)
+# ]
+
+@callback(
+    Output('logplotcontainer','children'),
+
+
+    Input("replot_data_btn", "n_clicks"),
+    State('log_range_slider', "value"),
+    State('logchs', "value"),
+    State('fft_range_slider', "value"),
+    State('new_formula_string', "value"),
+    State('fbins_toplot', 'value'),
+    State('log_session_data', 'data'),
+    prevent_initial_call=True
+)
+def explore_session_data_panel_formation(n1, drange, logchs, fftrange, nformulastring, nfbins, sdata):
+    step_rewards=sdata['step_rewards']
+    episode_total_rewards=sdata['episode_total_rewards']
+    acts=sdata['acts']
+    rdf=pd.read_json(sdata['rdf'], orient='records')
+    print(step_rewards)
+    print(episode_total_rewards)
+    orig_reward_fig=go.Figure(data=go.Scatter(x=list(step_rewards.keys()), y=list(step_rewards.values()), mode='lines+markers'))
+    orig_reward_fig.update_layout(title=f'Step reward data')
+    orig_episode_reward_fig=go.Figure(data=go.Scatter(x=list(episode_total_rewards.keys()), y=list(episode_total_rewards.values()), mode='lines+markers'))
+    orig_episode_reward_fig.update_layout(title=f'Total episode reward data')
+
+    global log_env
+
+
+    return [dcc.Graph(figure=orig_reward_fig), ' ', dcc.Graph(figure=orig_episode_reward_fig)]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
