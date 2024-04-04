@@ -643,7 +643,7 @@ def process_sfs_mainlog(logf):
             #print(i)
             action=datas[ind+1]
             action_reward=i['Action reward']
-            acts[float(action_reward)]=action
+            acts[curtimestep]=action
         if 'Episode total reward' in i.keys():
             print(i)
             #print(i)
@@ -751,7 +751,9 @@ def explore_session_data_panel_formation(n1, n2, sn, nformstr, nfbins):
     fbinstr=fbinstr[:-1]
     return vis,[],[],[], lrsmax, marks,  [0, lrsmax], logdata['n_timepoints_per_sample'], int(log_env.f_plot[-1]), [0, log_env.f_plot[-1]], opts, logdata, ['Original reward formula: '+logdata['reward_formula_string_orig'],
                                                                                                                                                             html.Br(),
-                                                                                                                                                            'Originally explored fbins: '+fbinstr] #, timesteps #logdata['n_timepoints_per_sample']
+                                                                                                                                                            'Originally explored fbins: '+fbinstr,
+                                                                                                                                                            html.Br(),
+                                                                                                                                                            'Original n timepoints per sample: '+str(logdata['n_timepoints_per_sample'])] #, timesteps #logdata['n_timepoints_per_sample']
 
 #n2+1
 
@@ -794,6 +796,40 @@ def explore_session_data_panel_formation(n1, n2, sn, nformstr, nfbins):
 #     html.Br(),
 #     html.Button("Update plots", id="replot_data_btn", style=b_vis, n_clicks=0), style=invis)
 # ]
+
+
+@callback(
+    Output('point_info', "value"),
+    Input("datapoint_display_btn", "n_clicks"),
+    State('query_datapoint','value'),
+    State('log_session_data', 'data'),
+    prevent_initial_call=True
+)
+def explore_session_data_panel_formation(n1, did, sdata):
+    try:
+        acts=sdata['acts']
+        print(acts.keys())
+        rdf=pd.read_json(sdata['rdf'], orient='records')
+        rdfp=rdf[rdf.datapoint==did]
+        print(rdfp)
+        cdtp=rdfp['t'].tolist()[0]
+        print(cdtp)
+        action=acts[cdtp]
+        print(action)
+    except Exception as e:
+        print('H')
+        print(e)
+    return json.dumps(action)
+
+
+
+
+
+
+
+
+
+
 
 @callback(
     Output('logplotcontainer','children'),
