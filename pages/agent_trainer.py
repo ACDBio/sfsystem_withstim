@@ -136,7 +136,7 @@ signal_log_exploration_controls=html.Div(id='signal_log_exploration_controls', c
     html.Br(),
     'Fft frequency bindings:',
     html.Br(),
-    dcc.RangeSlider(id='fft_range_slider',min=0, max=50, step=0.1, marks=None, value=[0, 1], tooltip={"placement": "bottom", "always_visible": True, "template": "{value} Hz"}),
+    dcc.RangeSlider(id='fft_range_slider',min=0, max=50, step=1, marks=None, value=[0, 1], tooltip={"placement": "bottom", "always_visible": True, "template": "{value} Hz"}),
     html.Br(),
     'Datapoint id for display: ',
     html.Br(),
@@ -730,7 +730,7 @@ def explore_session_data_panel_formation(n1, n2, sn):
 
 
     logdata['rdf']=logdata['rdf'].to_json(orient='records')
-    return vis,[],[],[], lrsmax, marks,  [0, lrsmax], logdata['n_timepoints_per_sample'], log_env.f_plot[-1], [0, log_env.f_plot[-1]], opts, logdata #, timesteps #logdata['n_timepoints_per_sample']
+    return vis,[],[],[], lrsmax, marks,  [0, lrsmax], logdata['n_timepoints_per_sample'], int(log_env.f_plot[-1]), [0, log_env.f_plot[-1]], opts, logdata #, timesteps #logdata['n_timepoints_per_sample']
 
 #n2+1
 
@@ -800,12 +800,27 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, nformulas
     orig_episode_reward_fig.update_layout(title=f'Total episode reward data')
     startind=drange[0]
     endind=drange[1]
+    startfft=fftrange[0]
+    endfft=fftrange[1]
+    f_plot_cur=[]
+    #print(log_env.f_plot)
+    for i in log_env.f_plot:
+        if i>=startfft and i<=endfft:
+        #    print('h')
+            f_plot_cur.append(i)
+    print(f_plot_cur)
+    startfftind=list(log_env.f_plot).index(f_plot_cur[0])
+    endfftind=list(log_env.f_plot).index(f_plot_cur[-1])
 
+   
     crd=rdf.iloc[startind:endind]
     crd=crd.to_numpy()[:,6:-1]
 
     cffts=log_env.get_fft_allchannels(crd)
+
+    #print(cffts.shape)
     fbins_data=log_env.get_bin_values_allchannels(cffts)
+    cffts_filtered=cffts[:,startfftind:endfftind]
 
     raw_signal=crd
     figs_raw_signal = []
@@ -814,16 +829,24 @@ def explore_session_data_panel_formation(n1, drange, logchs, fftrange, nformulas
    # print(raw_signal.shape)
     print(log_env.all_input_channels)
     for i in range(raw_signal.shape[1]):
-        print(i)
+        #print(i)
         fig = go.Figure(data=go.Scatter(x=timepoints, y=raw_signal[:, i], mode='lines'))
         fig.update_layout(title=f'Raw Signal for Channel {log_env.all_input_channels[i]}')
         figs_raw_signal.append(dcc.Graph(figure=fig))
+    figs_fft = []
+    for i in range(cffts_filtered.shape[0]):
+        fig = go.Figure(data=go.Scatter(x=f_plot_cur, y=cffts_filtered[i], mode='lines'))
+        fig.update_layout(title=f'FFT for Channel {log_env.all_input_channels[i]}')
+        figs_fft.append(dcc.Graph(figure=fig))
 
+    print(cffts_filtered.shape)
+    print(len(f_plot_cur[:-1]))
+    print(log_env.all_input_channels)
+    fig_heatmap_fft = go.Figure(data=go.Heatmap(z=cffts_filtered, x=f_plot_cur[:-1], y=log_env.all_input_channels))
+    fig_heatmap_fft.update_layout(title='Heatmap of FFT Results')
+    #fig_heatmap_fft.show()
 
-
-
-
-    return [dcc.Graph(figure=orig_reward_fig), ' ', dcc.Graph(figure=orig_episode_reward_fig)]+figs_raw_signal
+    return [dcc.Graph(figure=orig_reward_fig), dcc.Graph(figure=orig_episode_reward_fig)]+figs_raw_signal+figs_fft+[dcc.Graph(figure=fig_heatmap_fft)]
 
 
 
