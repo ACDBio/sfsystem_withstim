@@ -585,6 +585,9 @@ signal_log_exploration_controls=[
 @callback(
     Output("open_plot_panel", "n_clicks"),
     Output('signal_log_exploration_ctrl', "children"),
+    Output('training_figure_container', "children", allow_duplicate=True),
+    Output('signal_figure_container',  "children",  allow_duplicate=True),
+    Output('message_row', 'children', allow_duplicate=True),
 
     Input("load_session_data", "n_clicks"),
     State("open_plot_panel", "n_clicks"),
@@ -594,7 +597,7 @@ signal_log_exploration_controls=[
 def explore_session_data_panel_formation(n1, n2, sn):
     logf=f'./session_lib/{sn}/current_training.log'
     #session_settings=
-    return n2+1, signal_log_exploration_controls
+    return n2+1, signal_log_exploration_controls,[],[],[]
 
 
 
