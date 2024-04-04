@@ -126,6 +126,8 @@ signal_log_exploration_controls=html.Div(id='signal_log_exploration_controls', c
             children=[],
         ),
     dcc.Store(id='log_session_data',data=None),
+    html.Div(id='msg_logd', children=[]),
+    html.Br(),
     dcc.RangeSlider(id='log_range_slider',min=0, max=1, step=1, marks=None, value=[0, 1], tooltip={"placement": "bottom", "always_visible": True, "template": "Timestep {value}"}),
     html.Br(),
     'Interval for history plot calculations: ',
@@ -283,7 +285,7 @@ layout=html.Div(
                 #dcc.Input(type='number', placeholder='N channels', value=9, id='n_input_channels'),
                 #html.Br(),
                 'Channels to observe: ',
-                dcc.Input(type='text', placeholder='Channels of interest ch0,...chn', value='np_O1,np_P3,np_C3,np_F3,np_F4,np_C4,np_P4,np_O2,sf_enc', id='channels_of_interest', size=100),
+                dcc.Input(type='text', placeholder='Channels of interest ch0,...chn', value='np_O1,np_P3,np_C3,np_F3,np_F4,np_C4,np_P4,np_O2,sf_enc', id='channels_of_interest'),
                 html.Br(),
                 'N timepoints per sample: ',
                 dcc.Input(type='number', placeholder='N points', value=500, id='n_timepoints_per_sample'),
@@ -438,13 +440,13 @@ layout=html.Div(
             ]),
             html.Br(),
             html.Div(children=['Session data update minimal interval: ',
-            dcc.Input(type='number', placeholder='interval, ms', value=1000, id='info_upd_interval', size=30),
+            dcc.Input(type='number', placeholder='interval, ms', value=1000, id='info_upd_interval'),
             html.Br(),
             'Step count for a dynamic notrain session, trained model run, or direct feedback: ',
-            dcc.Input(type='number', placeholder='N steps', value=360, id='n_steps_notrain', size=30),
+            dcc.Input(type='number', placeholder='N steps', value=360, id='n_steps_notrain'),
             html.Br(),
             'Model location for upload (for the corresponding regimen): ',
-            dcc.Input(type='text', placeholder='session name/model name', value='default_session/best_total_episode_reward_model.zip', id='model_name', size=30),]), 
+            dcc.Input(type='text', placeholder='session name/model name', value='default_session/best_total_episode_reward_model.zip', id='model_name'),]), 
             offcanvas_session_lib,
             html.Div(children=[
             html.Button("Run training session", id="start_session_train", style=b_vis, n_clicks=0),
@@ -464,7 +466,7 @@ layout=html.Div(
             dcc.Checklist(options=['Train the logged model with the new settings'], value=[], id='train_logged_new'),
             html.Br(),
             'Action log location to launch: ',
-            dcc.Input(type='text', placeholder='session name/model name/action_no.log', value='default_session/action_0.log', id='action_log_name', size=30),
+            dcc.Input(type='text', placeholder='session name/model name/action_no.log', value='default_session/action_0.log', id='action_log_name'),
             html.Br(),
             html.Button("Trigger logged action", id="run_action", style=b_vis, n_clicks=0),            
                ]),
@@ -488,7 +490,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Button("Clear trainer results to the last 10 points", id="clear_trainer_data", style=b_vis, n_clicks=0),
                 html.Br(),
                 'Session name: ',
-                dcc.Input(type='text', placeholder='Session name (old data, if present, will be overwritten)', value='default_session', id='session_name', size=30),]),
+                dcc.Input(type='text', placeholder='Session name (old data, if present, will be overwritten)', value='default_session', id='session_name'),]),
                 html.Button("Set session name to current timestamp", id="set_session_name_to_timestamp", style=b_vis, n_clicks=0),
                 ' ',
                 html.Button("Load session data to explore", id="load_session_data", style=b_vis, n_clicks=0),  
@@ -521,13 +523,13 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 dcc.Markdown("##### Timer"),
      
                 'Timer interval or timer query interval: ',
-                dcc.Input(type='number', placeholder='N minutes', value=90, id='timer_interval_mins', size=30),
+                dcc.Input(type='number', placeholder='N minutes', value=90, id='timer_interval_mins'),
                 html.Br(),   
                 'Timer signal duration: ',    
-                dcc.Input(type='number', placeholder='N seconds', value=60, id='timer_signal_duration_s', size=30),  
+                dcc.Input(type='number', placeholder='N seconds', value=60, id='timer_signal_duration_s'),  
                 html.Br(),    
                 'Timer reward threshold: ',    
-                dcc.Input(type='number', placeholder='Reward value', value=-1, id='timer_reward_threshold', size=30), 
+                dcc.Input(type='number', placeholder='Reward value', value=-1, id='timer_reward_threshold'), 
                 html.Br(), 
 
                 html.Button("Run timer", id="run_timer", style=b_vis, n_clicks=0),  
@@ -693,14 +695,18 @@ def process_sfs_mainlog(logf):
     Output('fft_range_slider', 'value'),
     Output('logpoints', 'children'),
     Output('log_session_data', 'data'),
+    #Output('fbins_toplot','value'),
+    Output('msg_logd', 'children'),
 
 
     Input("load_session_data", "n_clicks"),
     State("open_plot_panel", "n_clicks"),
     State('session_name','value'),
+    State('new_formula_string', "value"),
+    State('fbins_toplot', 'value'),
     prevent_initial_call=True
 )
-def explore_session_data_panel_formation(n1, n2, sn):
+def explore_session_data_panel_formation(n1, n2, sn, nformstr, nfbins):
     logf=f'./session_lib/{sn}/current_training.log'
     logdata=process_sfs_mainlog(logf)
     timesteps=logdata['rdf']['datapoint'].tolist()
@@ -717,20 +723,35 @@ def explore_session_data_panel_formation(n1, n2, sn):
     for i in range(0, len(timesteps), mark_every):
         marks[i]=dpts[i]
     print('marks setup')
+
+    binlist=nfbins.split(';')
+    fbins=[]
+    for b in binlist:
+        bin=b.split(',')
+        bin=list(map(int, bin))
+        bin=tuple(bin)
+        fbins.append(bin)
+
     global log_env
     log_env=SFSystemCommunicator(offline_mode=True, 
                                 input_channels=logdata['channels'], 
                                 n_timepoints_per_sample=logdata['n_timepoints_per_sample'], 
                                 delay=logdata['delay'],
-                                reward_formula_string=logdata['reward_formula_string_orig'],
-                                fbins=logdata['fbins'])
+                                reward_formula_string=nformstr,
+                                fbins=fbins)
     opts=[]
     for  i in timesteps:
         opts.append(html.Option(label=i, value=i))
 
 
     logdata['rdf']=logdata['rdf'].to_json(orient='records')
-    return vis,[],[],[], lrsmax, marks,  [0, lrsmax], logdata['n_timepoints_per_sample'], int(log_env.f_plot[-1]), [0, log_env.f_plot[-1]], opts, logdata #, timesteps #logdata['n_timepoints_per_sample']
+    fbinstr=''
+    for i in logdata['fbins']:
+        fbinstr+=f'{i[0]},{i[1]};'
+    fbinstr=fbinstr[:-1]
+    return vis,[],[],[], lrsmax, marks,  [0, lrsmax], logdata['n_timepoints_per_sample'], int(log_env.f_plot[-1]), [0, log_env.f_plot[-1]], opts, logdata, ['Original reward formula: '+logdata['reward_formula_string_orig'],
+                                                                                                                                                            html.Br(),
+                                                                                                                                                            'Originally explored fbins: '+fbinstr] #, timesteps #logdata['n_timepoints_per_sample']
 
 #n2+1
 
@@ -782,13 +803,12 @@ def explore_session_data_panel_formation(n1, n2, sn):
     State('log_range_slider', "value"),
     State('logchs', "value"),
     State('fft_range_slider', "value"),
-    State('new_formula_string', "value"),
-    State('fbins_toplot', 'value'),
     State('log_session_data', 'data'),
     State('log_intermedcalc_interval', 'value'),
+    State('msg_logd', 'children'),
     prevent_initial_call=True
 )
-def explore_session_data_panel_formation(n1, drange, logchs, fftrange, nformulastring, nfbins, sdata, analysis_step):
+def explore_session_data_panel_formation(n1, drange, logchs, fftrange, sdata, analysis_step, msg_logd):
     global log_env
     step_rewards=sdata['step_rewards']
     episode_total_rewards=sdata['episode_total_rewards']
