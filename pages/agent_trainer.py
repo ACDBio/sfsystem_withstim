@@ -788,21 +788,42 @@ def explore_session_data_panel_formation(n1, n2, sn):
     prevent_initial_call=True
 )
 def explore_session_data_panel_formation(n1, drange, logchs, fftrange, nformulastring, nfbins, sdata):
+    global log_env
     step_rewards=sdata['step_rewards']
     episode_total_rewards=sdata['episode_total_rewards']
     acts=sdata['acts']
     rdf=pd.read_json(sdata['rdf'], orient='records')
-    print(step_rewards)
-    print(episode_total_rewards)
+
     orig_reward_fig=go.Figure(data=go.Scatter(x=list(step_rewards.keys()), y=list(step_rewards.values()), mode='lines+markers'))
     orig_reward_fig.update_layout(title=f'Step reward data')
     orig_episode_reward_fig=go.Figure(data=go.Scatter(x=list(episode_total_rewards.keys()), y=list(episode_total_rewards.values()), mode='lines+markers'))
     orig_episode_reward_fig.update_layout(title=f'Total episode reward data')
+    startind=drange[0]
+    endind=drange[1]
 
-    global log_env
+    crd=rdf.iloc[startind:endind]
+    crd=crd.to_numpy()[:,6:-1]
+
+    cffts=log_env.get_fft_allchannels(crd)
+    fbins_data=log_env.get_bin_values_allchannels(cffts)
+
+    raw_signal=crd
+    figs_raw_signal = []
+    timepoints=rdf.datapoint.tolist()
+    #print(raw_signal)
+   # print(raw_signal.shape)
+    print(log_env.all_input_channels)
+    for i in range(raw_signal.shape[1]):
+        print(i)
+        fig = go.Figure(data=go.Scatter(x=timepoints, y=raw_signal[:, i], mode='lines'))
+        fig.update_layout(title=f'Raw Signal for Channel {log_env.all_input_channels[i]}')
+        figs_raw_signal.append(dcc.Graph(figure=fig))
 
 
-    return [dcc.Graph(figure=orig_reward_fig), ' ', dcc.Graph(figure=orig_episode_reward_fig)]
+
+
+
+    return [dcc.Graph(figure=orig_reward_fig), ' ', dcc.Graph(figure=orig_episode_reward_fig)]+figs_raw_signal
 
 
 
