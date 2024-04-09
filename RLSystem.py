@@ -16,6 +16,9 @@ import webcolors
 import random
 import threading
 import shutil
+import sounddevice as sd
+import soundfile as sf
+
 plotly.io.json.config.default_engine = 'orjson'
 websocket.enableTrace(False)
 from datetime import datetime
@@ -143,7 +146,11 @@ class SFSystemCommunicator(gym.Env):
                  reward_np_sigqual_thresh=90,
                  basic_np_sigqual_thresh=80,
                  send_np_signal_to_display=True,
-                 offline_mode=False):
+                 offline_mode=False,                    
+                 mic_log_continuous=False,
+                 mic_log_onclick=False):
+        self.mic_log_continuous=mic_log_continuous
+        self.mic_log_onclick=mic_log_onclick
         
 
         self.reward_np_sigqual_thresh=reward_np_sigqual_thresh
@@ -319,7 +326,32 @@ class SFSystemCommunicator(gym.Env):
         self.cur_action_log_no=0
         if not offline_mode:
             self.get_np_sig_qual()
-
+        self.mic_sample_rate=8000 #44100 # Hz
+        self.chunk_duration=5.0 #seconds
+        self.audiofile='miclog_continuous.wav'
+        self.is_closed=False
+    def run_micrec_continuous(self):
+        while self.is_closed==False:
+            try:
+                chunk = sd.rec(int(self.chunk_duration * self.mic_sample_rate), samplerate=self.mic_sample_rate, channels=1, blocking=True)
+                existing_data, existing_sample_rate = sf.read(self.audiofile)
+                combined_data = np.concatenate((existing_data, chunk.reshape(-1)), axis=0)
+                sf.write(self.audiofile, combined_data, existing_sample_rate, subtype='PCM_16')
+                print("Mic chunk recorded and appended.")
+            except Exception as e:
+                print(e)
+                print('Stoppping the mic log...')
+                break
+        return True
+    def start_mic_log(self):
+        now = datetime.now()
+        formatted_now = now.strftime("%d:%m:%Y_%H:%M:%S") 
+        chunk = sd.rec(int(self.chunk_duration * self.mic_sample_rate), samplerate=self.mic_sample_rate, channels=1, blocking=True)
+        sf.write(self.audiofile, chunk.reshape(-1), self.mic_sample_rate, subtype='PCM_16')
+        micthread=threading.Thread(target=self.run_micrec_continuous)
+        micthread.daemon = True
+        micthread.start()
+        print('Started continuous mic recording')
     def get_np_sig_qual(self):
         print('Sampling signal quality')
         sqdone=False
@@ -1090,6 +1122,8 @@ class SFSystemCommunicator(gym.Env):
         self.best_overall_reward_now=False
         self.best_total_episode_reward_now=False
     def close(self, clear_log=False):
+        self.is_closed=True
+        self.audiofile=None
         if self.ws_sf.connected:
             self.ws_sf.send("turn_off_display")
             self.stop_audiovis_feedback() #just in case
@@ -1223,6 +1257,8 @@ class stable_baselines_model_trainer():
                     start_on_click=False,
                     pause_learning_if_reward_sig_qual_false=False,
                     start_on_reward_sig_qual=False):
+
+
         self.start_on_click=start_on_click
         self.pause_learning_if_reward_sig_qual_false=pause_learning_if_reward_sig_qual_false
         self.start_on_reward_sig_qual=start_on_reward_sig_qual
@@ -1259,8 +1295,8 @@ class stable_baselines_model_trainer():
                 self.env.start_edf_log()
                 print('EDF log started:')
                 print(self.env.edfpath)
-
-
+        if self.env.mic_log_continuous:
+            self.env.start_mic_log()
     def direct_feedback_run(self, reward_mapping_min, reward_mapping_max, overlay_random, mapped_outputs, min_space_value=-1, max_space_value=1):
         if  self.env.use_neuroplay==True:
             if self.env.write_edf_ann==True:

@@ -540,6 +540,12 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 dcc.Input(type='number', placeholder='Interval, s  (-1 for never)', value=-1, id='clear_trainer_data_n_seconds'), 
                 html.Br(),
                 html.Br(),
+                html.Div(
+                   children=[dcc.Markdown("#### Mic logging"),
+                             html.Hr(),
+                             dcc.Dropdown(multi=False, options=['Continuous logging', 'Log on click'], value='Continuous logging', id='mic_log_opts', style={'width': '30%'})]
+                ),
+                html.Br(),
                 html.Div(children=[
                 dcc.Markdown("#### Deterministic modes"),
                 html.Hr(),
@@ -1515,6 +1521,7 @@ def get_state_from_model_logfile(logfile=None):
           State('pause_learning_if_reward_sig_qual_false','value'),
           State('start_on_reward_sig_qual', 'value'),
           State('reward_np_sigqual_thresh', 'value'),
+          State('mic_log_opts', 'value'),
           prevent_initial_call=True)
 def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, n_clicks_stop_direct_feedback, 
                      n_clicks_run_action,  n_clicks_action_from_string,
@@ -1541,11 +1548,19 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                     pause_learning_if_reward_sig_qual_false,
                     start_on_reward_sig_qual,
                     reward_np_sigqual_thresh,
-
+                    mic_log_opts
                     ):
     
 
     edf_ann_fn=session_name+'_edf'
+    if 'Continuous logging' in mic_log_opts:
+        mic_log_continuous=True
+    else:
+        mic_log_continuous=False
+    if 'Log on click' in mic_log_opts:
+        mic_log_onclick=True
+    else:
+        mic_log_onclick=False
 
     if len(start_on_reward_sig_qual)>0:
         start_on_reward_sig_qual=True
@@ -1659,7 +1674,9 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 send_reward_to_display=send_reward_to_display,
                                                 text_size=text_size,
                                                 reward_np_sigqual_thresh=reward_np_sigqual_thresh,
-                                                send_np_signal_to_display=send_np_signal_to_display)
+                                                send_np_signal_to_display=send_np_signal_to_display,
+                                                mic_log_continuous=mic_log_continuous,
+                                                mic_log_onclick=mic_log_onclick)
         time.sleep(5)    
 
 
@@ -1790,7 +1807,9 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                             send_reward_to_display=send_reward_to_display,
                                             text_size=text_size,
                                             reward_np_sigqual_thresh=reward_np_sigqual_thresh,
-                                            send_np_signal_to_display=send_np_signal_to_display)    
+                                            send_np_signal_to_display=send_np_signal_to_display,
+                                            mic_log_continuous=mic_log_continuous,
+                                            mic_log_onclick=mic_log_onclick)    
         time.sleep(20) 
         trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                             algorithm=sd['algorithm'],
