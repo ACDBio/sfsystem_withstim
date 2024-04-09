@@ -108,6 +108,13 @@ def clear_wavs():
     for f in cfiles:
         if f.endswith('.wav'):
             os.remove(cwd+f)
+def clear_unclicked_wavs():
+    cfiles=os.listdir('./')
+    cwd=os.getcwd()+'/'
+    for f in cfiles:
+        if f.endswith('_0.wav'):
+            os.remove(cwd+f)
+
 def clear_edfs():
     cfiles=os.listdir('./')
     cwd=os.getcwd()+'/'
@@ -555,7 +562,10 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Div(
                    children=[dcc.Markdown("#### Mic logging"),
                              html.Hr(),
-                             dcc.Dropdown(multi=True, options=['Continuous logging', 'Log on click', 'Separate files logging'], value=['Continuous logging'], id='mic_log_opts', style={'width': '50%'})]
+                             dcc.Dropdown(multi=False, options=['Continuous logging', 'Log on click', 'Separate files logging'], value='Separate files logging', id='mic_log_opts', style={'width': '50%'}),
+                             ' ',
+                             html.Button("Clear unclicked .wav logs ", id="clear_unclicked_wavs", style=b_vis, n_clicks=0),                       
+                             ]
                 ),
                 html.Br(),
                 html.Div(children=[
@@ -1352,6 +1362,13 @@ def clear_session_lib(n_clicks):
     os.mkdir('./session_dir')
     return get_dir_tree('./session_lib')
 
+@callback(Output('clear_unclicked_wavs', 'children'),
+          Input('clear_unclicked_wavs', 'n_clicks'),
+          State('clear_unclicked_wavs', 'children'),
+          prevent_initial_call=True)
+def clear_logfiles(n_clicks, ch):
+    clear_unclicked_wavs()
+    return ch
 
 @callback(Output('clear_logfiles', 'children'),
           Input('clear_logfiles', 'n_clicks'),

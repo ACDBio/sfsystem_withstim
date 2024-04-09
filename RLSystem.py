@@ -151,6 +151,7 @@ class SFSystemCommunicator(gym.Env):
                  mic_log_continuous=False,
                  mic_log_onclick=False,
                  mic_log_sepfiles=False):
+        self.is_paused=False
         self.mic_log_continuous=mic_log_continuous
         self.mic_log_onclick=mic_log_onclick
         self.mic_log_sepfiles=mic_log_sepfiles
@@ -1040,6 +1041,14 @@ class SFSystemCommunicator(gym.Env):
                     self.ws_sf.send(msg)
                 if self.mic_log_sepfiles:
                     micthread_sepf.join()
+                    try:
+                        print('Renaming mic log...')
+                        if self.enc_is_clicked:
+                            os.rename(self.micf_cur, self.micf_cur.split('.wa')[0]+'_enc_1.wav')
+                        else:
+                            os.rename(self.micf_cur, self.micf_cur.split('.wa')[0]+'_enc_0.wav')
+                    except Exception as e:
+                        print(e)
                 return self.new_observations_tarchs, reward, self.done, {} #False
             else:
                 print('No connection')
