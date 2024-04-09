@@ -537,6 +537,9 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 ' ',
                 html.Button("Load session data to explore", id="load_session_data", style=b_vis, n_clicks=0),  
                 html.Br(),
+                dcc.Checklist(options=['Load session data from EDF'], value=['Load session data from EDF'], id='load_from_edf'),
+                html.Br(),
+                html.Br(),
                 dcc.Checklist(options=['Save actions on encoder hold'], value=['Save actions on encoder hold'], id='log_actions_on_hold'),
                 html.Br(),
                 dbc.Button("Show session data panel", id="open_plot_panel", n_clicks=0),  
@@ -650,6 +653,182 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
 
 
 
+def process_edf_mainlog(logf):
+    import mne
+    import pandas as pd
+    print('Processing maain EDF log file')
+    edfp='/home/biorp/Documents/PlatformIO/Projects/SFSystem_withAV/session_lib/default_session/default_session_edf/default_session_edf.edf'
+    edf = mne.io.read_raw_edf(edfp, preload=True)
+
+    # Extract the data from the EDF file
+    data = edf.get_data()
+    annotations=edf.annotations.to_data_frame()
+
+    # Get the channel names
+    ch_names = edf.ch_names
+
+    # Create a pandas DataFrame
+    df = pd.DataFrame(data.T, columns=ch_names)
+    df['t']=edf.times
+    annotations['t']=edf.annotations.onset
+    anndescriptors=annotations['description'].unique().tolist()
+    sann=False
+    eann=False
+    micann=False
+    actann=False
+    rewann=False
+    acts={}
+    micfs={}
+    steprewards={}
+    episode_total_rewards={}
+    alltimestamps=df['t'].tolist()
+
+    anndata={}
+
+    cstep=0
+    cepisode=0
+    cts=0
+    crev=0
+    etrev=0
+    cact=None
+    cmiclogf=None
+    onset=None
+    for i in annotations.index.tolist():
+        anndt=annotations.iloc[i]
+        descr=anndt['description']
+        #print(anndt)
+        towrite=False
+        #onset=anndata['t']
+        if 'episode_' in descr:
+            episode=descr.split('episode_')[1].split('_')[0]
+            cepisode=episode
+            towrite=True
+        if '_step_' in descr:
+            step=descr.split('_step_')[1]
+            cstep=step
+            onset=anndt['t'] #onsets aalign with step onset
+            towrite=True
+        if 'sr_' in descr:
+            reward=float(descr.split('sr_')[1].split('_')[0])
+            crev=reward
+            steprewards[f't_{onset}_ep_{cepisode}_step{cstep}']=crev
+            towrite=True
+        if '_tcer_' in descr:
+            episode_total_reward=float(descr.split('_tcer_')[1])
+            etrev=episode_total_reward
+            episode_total_rewards[f't_{onset}_ep_{cepisode}']=etrev
+            towrite=True
+        if 'MICLOGF' in descr:
+            miclogf=descr.split('MICLOGF_')[1]
+            cmiclogf=miclogf
+            micfs[onset]=cmiclogf
+            towrite=True
+        if 'action' in descr:
+            action=descr.split('action_')[1]
+            cact=action
+            acts[onset]=action
+            towrite=True
+        if onset!=None:
+            if towrite==True:
+                anndata[onset]={'episode':cepisode,
+                                'step':cstep,
+                                'miclogf':cmiclogf,
+                                'action':cact,
+                                'reward':crev}
+
+
+    anndata_edfonsets={}
+    anndata_keys=np.array(list(anndata.keys()))
+    for i in alltimestamps:
+        tarkeys=anndata_keys[anndata_keys<i]
+        if len(tarkeys)>0:
+            tarind=np.argmin(np.abs(tarkeys - i))
+            closest=tarkeys[tarind]
+            anndata_edfonsets[i]=anndata[closest]
+        else:
+            anndata_edfonsets[i]={'episode':-1,
+                                'step':-1,
+                                'miclogf':'None',
+                                'action':'None',
+                                'reward':0}
+
+    for i in anndescriptors:
+        if 'episode_' in i:
+            eann==True
+        if 'step_' in i:
+            sann==True
+        if 'MICLOGF_' in i:
+            micann==True
+        if 'sr_' in i:
+            rewann=True
+
+
+
+    if rewann==False:
+        df['rev']=0
+    else:
+        rewards=[]
+        for i in anndata_edfonsets:
+            rewards.append(anndata_edfonsets[i]['reward'])
+        df['rev']=rewards
+    if sann==False:
+        df['step']=0
+    else:
+        steps=[]
+        for i in anndata_edfonsets:
+            steps.append(anndata_edfonsets[i]['step'])
+        df['step']=steps
+    if sann==False:
+        df['episode']=0
+    else:
+        episodes=[]
+        for i in anndata_edfonsets:
+            episodes.append(anndata_edfonsets[i]['episode'])
+        df['episode']=episodes
+
+    acts={}
+    miclogs={}
+
+
+    if actann==False:
+        for i in alltimestamps:
+            acts[i]='NotLogged'
+    else:
+        for i in alltimestamps:
+            acts[i]=anndata_edfonsets[i]['action']
+    if micann==False:
+        for i in alltimestamps:
+            miclogs[i]='NotLogged'
+    else:
+        for i in alltimestamps:
+            miclogs[i]=anndata_edfonsets[i]['miclogf']
+    df['datapoint']='ep_'+df['episode'].astype(str)+'|st_'+df['step'].astype(str)+'|'+df['t'].astype(str)+'|'+df['rev'].astype(str)
+
+    fdf=df[['episode','step','t']]
+    fdf['dtp']=0
+    fdf['wsi']=0
+    chofi=[]
+    for i in ch_names:
+        fdf['np_'+i]=df[i]
+        chofi.append('np_'+i)
+    sf_chnames=['sf_ch1','sf_ch2','sf_ch3','sf_ch4','sf_ch5','sf_ch6','sf_ch7','sf_ch8','sf_enc']
+    for i in sf_chnames:
+        fdf[i]=0
+    fdf['datapoint']=df['datapoint']
+    print('EDF log processing complete')
+    return {'session_settings':{},
+            'delay':8, #because 125 Hz by default
+            'n_timepoints_per_sample':10,
+            'fbins':[[2,4]], #just stump
+            'channels':chofi,
+            'reward_formula_string_orig':'raw_ch0',
+            'step_rewards':steprewards, 
+            'episode_total_rewards':episode_total_rewards, 
+            'acts':acts, 
+            'miclogs':miclogs,
+            'rdf':fdf}
+
+
 def process_sfs_mainlog(logf):
     global channel_spec
     print('Reading the log file')
@@ -755,11 +934,18 @@ def process_sfs_mainlog(logf):
     State('session_name','value'),
     State('new_formula_string', "value"),
     State('fbins_toplot', 'value'),
+    State('load_from_edf', 'value'),
     prevent_initial_call=True
 )
-def explore_session_data_panel_formation(n1, n2, sn, nformstr, nfbins):
-    logf=f'./session_lib/{sn}/current_training.log'
-    logdata=process_sfs_mainlog(logf)
+def explore_session_data_panel_formation(n1, n2, sn, nformstr, nfbins, fromedf):
+    if len(fromedf)>0:
+        fromedf=True
+        logf='./session_lib/{sn}/{sn}_edf/{sn}_edf.edf'
+        logdata=process_edf_mainlog(logf)
+    else:
+        fromedf=False
+        logf=f'./session_lib/{sn}/current_training.log'
+        logdata=process_sfs_mainlog(logf)
     timesteps=logdata['rdf']['datapoint'].tolist()
     print(len(timesteps))
     lrsmax=len(timesteps)
