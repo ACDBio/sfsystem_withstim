@@ -928,6 +928,7 @@ class SFSystemCommunicator(gym.Env):
                         if self.edf_step_annotation==True:                         
                             self.add_edf_log_text(text=f'episode_{self.current_episode}_step_{self.cur_step}_timestamp_{formatted_now}_action_{actionstring}')
                             self.write_edf_annotation_fn(ann_text=f'episode_{self.current_episode}_step_{self.cur_step}', ann_duration_ms=self.step_stim_length_millis)
+                            self.write_edf_annotation_fn(ann_text=f'action_{actionstring}', ann_duration_ms=self.step_stim_length_millis)
 
                 self.done=False
                 self.best_overall_reward_now=False
@@ -939,6 +940,10 @@ class SFSystemCommunicator(gym.Env):
                 if self.mic_log_sepfiles:
                     print('In mic logging thread startup')
                     self.micf_cur=f'episode_{self.current_episode}_step_{self.cur_step}_timestamp_{formatted_now}.wav'
+                    if self.ws_np is not None:
+                        if self.write_edf_ann==True:       
+                            self.write_tolog(json.dumps({'MICLOGF':[self.micf_cur]}))               
+                            self.write_edf_annotation_fn(text=f'MICLOGF_episode_{self.current_episode}_step_{self.cur_step}_timestamp_{formatted_now}.wav', ann_duration_ms=self.step_stim_length_millis)
                     micthread_sepf=threading.Thread(target=self.run_micreg_singular)
                     micthread_sepf.daemon = True
                     micthread_sepf.start()
@@ -998,9 +1003,9 @@ class SFSystemCommunicator(gym.Env):
                 if self.collect_data_toplot:
                     self.cur_episode_rewards.append(reward_val)
                 if self.log_steps:
-                    now = datetime.now()
-                    # Format the date and time
-                    formatted_now = now.strftime("%d:%m:%Y_%H:%M:%S")
+                    # now = datetime.now()
+                    # # Format the date and time
+                    # formatted_now = now.strftime("%d:%m:%Y_%H:%M:%S")
                     self.write_tolog(json.dumps({'Timestamp':f'{formatted_now}','Episode':self.current_episode, 'Step': self.cur_step, 'Step reward': reward_val}))
                     if self.ws_np is not None:
                         self.write_tolog(json.dumps({'NP chqual':self.chquals, 'NP reward qual filter status':self.reward_sig_qual_filter_status, 'NP reward sig qual filter thresh': self.reward_np_sigqual_thresh}))
