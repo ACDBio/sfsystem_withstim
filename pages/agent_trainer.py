@@ -19,7 +19,6 @@ import plotly.io as pio
 pio.templates.default = 'simple_white'
 
 
-
 channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',5:'np_C4',6:'np_P4',7:'np_O2',
               8:'sf_ch1',9:'sf_ch2',10:'sf_ch3',11:'sf_ch4',12:'sf_ch5',13:'sf_ch6',14:'sf_ch7',15:'sf_ch8',16:'sf_enc'}
 
@@ -102,6 +101,19 @@ offcanvas_channel_specification = html.Div(
         ),
     ]
 )
+
+def clear_wavs():
+    cfiles=os.listdir('./')
+    cwd=os.getcwd()+'/'
+    for f in cfiles:
+        if f.endswith('.wav'):
+            os.remove(cwd+f)
+def clear_edfs():
+    cfiles=os.listdir('./')
+    cwd=os.getcwd()+'/'
+    for f in cfiles:
+        if f.endswith('_edf'):
+            shutil.rmtree(f)
 
 def get_dir_tree(dirloc):
     results=[]
@@ -1314,13 +1326,17 @@ def copy_file(source_file_path, destination_folder_path):
           prevent_initial_call=True)
 def copy_session_logs_to_lib(n_clicks, sname):
     session_dir=f'./session_lib/{sname}'
+    wavdir=session_dir+'/wavs'
     if os.path.isdir(session_dir):
         shutil.rmtree(session_dir)
     os.mkdir(session_dir)
+    os.mkdir(wavdir)
     cfiles=os.listdir('./')
     for f in cfiles:
         if f in ['current_training.log', 'model_stats.log','best_total_episode_reward_model.zip','best_overall_reward_model.zip' ,'last_model.zip']:
             copy_file(f'./{f}', session_dir)
+        if f.endswith('.wav'):
+            copy_file(f'./{f}', wavdir)
         if 'act' in f:  #copy actions
             copy_file(f'./{f}', session_dir)
         if f==f'{sname}_edf':
@@ -1351,6 +1367,8 @@ def clear_logfiles(n_clicks, ch, logfn):
         os.remove('model_stats.log')
     if not os.path.isfile('model_stats.log'):
         open('model_stats.log', 'a').close()
+    clear_wavs()
+    clear_edfs()
     return ch
 
 @callback(Output('message_row', 'children', allow_duplicate=True),
