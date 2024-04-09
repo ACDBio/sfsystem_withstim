@@ -148,10 +148,11 @@ class SFSystemCommunicator(gym.Env):
                  send_np_signal_to_display=True,
                  offline_mode=False,                    
                  mic_log_continuous=False,
-                 mic_log_onclick=False):
+                 mic_log_onclick=False,
+                 mic_log_sepfiles=False):
         self.mic_log_continuous=mic_log_continuous
         self.mic_log_onclick=mic_log_onclick
-        
+        self.mic_log_sepfiles=mic_log_sepfiles
 
         self.reward_np_sigqual_thresh=reward_np_sigqual_thresh
         self.basic_np_sigqual_thresh=basic_np_sigqual_thresh

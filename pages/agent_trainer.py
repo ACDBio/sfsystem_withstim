@@ -543,7 +543,7 @@ dbc.Col(children=[dcc.Markdown("### Session Data"),
                 html.Div(
                    children=[dcc.Markdown("#### Mic logging"),
                              html.Hr(),
-                             dcc.Dropdown(multi=False, options=['Continuous logging', 'Log on click'], value='Continuous logging', id='mic_log_opts', style={'width': '30%'})]
+                             dcc.Dropdown(multi=True, options=['Continuous logging', 'Log on click', 'Separate files logging'], value=['Continuous logging'], id='mic_log_opts', style={'width': '50%'})]
                 ),
                 html.Br(),
                 html.Div(children=[
@@ -1562,6 +1562,11 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
     else:
         mic_log_onclick=False
 
+    if 'Separate files logging' in mic_log_opts:
+        mic_log_sepfiles=True
+    else:
+        mic_log_sepfiles=False
+
     if len(start_on_reward_sig_qual)>0:
         start_on_reward_sig_qual=True
     else:
@@ -1676,7 +1681,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 reward_np_sigqual_thresh=reward_np_sigqual_thresh,
                                                 send_np_signal_to_display=send_np_signal_to_display,
                                                 mic_log_continuous=mic_log_continuous,
-                                                mic_log_onclick=mic_log_onclick)
+                                                mic_log_onclick=mic_log_onclick,
+                                                mic_log_sepfiles=mic_log_sepfiles)
         time.sleep(5)    
 
 
@@ -1809,7 +1815,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                             reward_np_sigqual_thresh=reward_np_sigqual_thresh,
                                             send_np_signal_to_display=send_np_signal_to_display,
                                             mic_log_continuous=mic_log_continuous,
-                                            mic_log_onclick=mic_log_onclick)    
+                                            mic_log_onclick=mic_log_onclick,
+                                            mic_log_sepfiles=mic_log_sepfiles)    
         time.sleep(20) 
         trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                             algorithm=sd['algorithm'],
