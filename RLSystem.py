@@ -18,6 +18,7 @@ import threading
 import shutil
 import sounddevice as sd
 import soundfile as sf
+from scipy.io.wavfile import write as wavwrite
 
 plotly.io.json.config.default_engine = 'orjson'
 websocket.enableTrace(False)
@@ -344,6 +345,26 @@ class SFSystemCommunicator(gym.Env):
                 print('Stoppping the mic log...')
                 break
         return True
+    def run_micreg_singular(self, micregfn=None, recduration=None):
+        try:
+            print('Starting singular mic recording')
+            if str(micregfn)=='None':
+                micregfn=self.micf_cur
+            if str(recduration)=='None':
+                recduration=self.step_stim_length
+            
+            print(f'Recfilename: {micregfn}')
+            print(f'Recduration: {recduration}')
+            recording = sd.rec(int(recduration * self.mic_sample_rate), samplerate=self.mic_sample_rate, channels=1)
+            sd.wait()
+            wavwrite(micregfn, self.mic_sample_rate, recording)
+            print('Mic log file recorded')
+            return True
+        except Exception as e:
+            print('Mic logging error:')
+            print(e)
+        
+
     def start_mic_log(self):
         now = datetime.now()
         formatted_now = now.strftime("%d:%m:%Y_%H:%M:%S") 
@@ -893,16 +914,17 @@ class SFSystemCommunicator(gym.Env):
             if self.write_raw==True:
                 self.write_tolog(json.dumps({'raw_data':self.cur_observations['raw_data'].tolist()}))
     def step(self, action):
+        print(f'Mic Logging Opt: {self.mic_log_sepfiles}')
         #print(action)
         try:
             self.current_actions=action
             actionstring=self.get_json_string_from_ordered_dict(action)
+            now = datetime.now()
+            formatted_now = now.strftime("%d:%m:%Y_%H:%M:%S")   
             if self.ws_sf is not None:
                 if self.ws_np is not None:
                     if self.write_edf_ann==True:
-                        if self.edf_step_annotation==True:
-                            now = datetime.now()
-                            formatted_now = now.strftime("%d:%m:%Y_%H:%M:%S")                            
+                        if self.edf_step_annotation==True:                         
                             self.add_edf_log_text(text=f'episode_{self.current_episode}_step_{self.cur_step}_timestamp_{formatted_now}_action_{actionstring}')
                             self.write_edf_annotation_fn(ann_text=f'episode_{self.current_episode}_step_{self.cur_step}', ann_duration_ms=self.step_stim_length_millis)
 
@@ -913,6 +935,14 @@ class SFSystemCommunicator(gym.Env):
 
 
                 self.update_audiovis_feedback(update_dict=action)
+                if self.mic_log_sepfiles:
+                    print('In mic logging thread startup')
+                    self.micf_cur=f'episode_{self.current_episode}_step_{self.cur_step}_timestamp_{formatted_now}.wav'
+                    micthread_sepf=threading.Thread(target=self.run_micreg_singular)
+                    micthread_sepf.daemon = True
+                    micthread_sepf.start()
+                    print('Started sepfile mic log')
+
                 time.sleep(self.step_stim_length)
                 # if self.ws_np is not None:
                 #     self.get_np_sig_qual()
@@ -1008,7 +1038,8 @@ class SFSystemCommunicator(gym.Env):
                     sigquals=' '.join([f'{ch} {i}' for ch,i in self.chquals.items()])
                     msg='display_text:'+'1'+':'+f'R {np.round(reward,3)} Quals {sigquals}'
                     self.ws_sf.send(msg)
-
+                if self.mic_log_sepfiles:
+                    micthread_sepf.join()
                 return self.new_observations_tarchs, reward, self.done, {} #False
             else:
                 print('No connection')

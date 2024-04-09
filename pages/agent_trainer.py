@@ -1557,6 +1557,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         mic_log_continuous=True
     else:
         mic_log_continuous=False
+
     if 'Log on click' in mic_log_opts:
         mic_log_onclick=True
     else:
@@ -1566,6 +1567,8 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         mic_log_sepfiles=True
     else:
         mic_log_sepfiles=False
+
+    print(f'Mic Log Opt at init: {mic_log_sepfiles}')
 
     if len(start_on_reward_sig_qual)>0:
         start_on_reward_sig_qual=True
