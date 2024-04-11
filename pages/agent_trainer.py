@@ -807,6 +807,7 @@ def process_edf_mainlog(logf):
     fdf=df[['episode','step','t']]
     fdf['dtp']=0
     fdf['wsi']=0
+    fdf['rev']=df['rev']
     chofi=[]
     for i in ch_names:
         fdf['np_'+i]=df[i]
@@ -815,6 +816,8 @@ def process_edf_mainlog(logf):
     for i in sf_chnames:
         fdf[i]=0
     fdf['datapoint']=df['datapoint']
+    print(fdf.columns.tolist())
+    print(fdf.shape)
     print('EDF log processing complete')
     return {'session_settings':{},
             'delay':8, #because 125 Hz by default
@@ -894,8 +897,11 @@ def process_sfs_mainlog(logf):
         datapiece+=1
         
     rdf=pd.concat(rd)
+
    # print(rd)
     rdf['datapoint']='ep_'+rdf['episode'].astype(str)+'|st_'+rdf['step'].astype(str)+'|'+rdf['t']+'|'+rdf['dtp'].astype(str)+'|'+rdf['wsi'].astype(str)+'|'+rdf['rev'].astype(str)
+    print(rdf.columns.tolist())
+    print(rdf.shape)
     print('Logfile read done.')
     return {'session_settings':session_settings,
             'datas':datas,
