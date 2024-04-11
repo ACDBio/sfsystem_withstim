@@ -1055,7 +1055,7 @@ def explore_session_data_panel_formation(n1, did, sdata):
         rdf=pd.read_json(sdata['rdf'], orient='records')
         rdfp=rdf[rdf.datapoint==did]
         print(rdfp)
-        cdtp=rdfp['t'].tolist()[0]
+        cdtp=str(rdfp['t'].tolist()[0])
         print(cdtp)
         action=acts[cdtp]
         print(action)
