@@ -21,7 +21,7 @@ from cwt import ComplexMorletCWT
 tf.compat.v1.disable_eager_execution()
 #%env XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/cuda
 os.environ['XLA_FLAGS'] = '--xla_gpu_cuda_data_dir=/usr/lib/cuda'
-
+import mne
 
 
 channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',5:'np_C4',6:'np_P4',7:'np_O2',
@@ -46,10 +46,10 @@ class SklearnEEGModelReader():
         self.channels=inputdescr.split('CHANNELS_')[1].split('_SF_')[0].split(',')
         self.sfrequency=int(inputdescr.split('_SF_')[1].split('_WIN_')[0])
         #self.window=int(inputdescr.split('_WIN_')[1].split('_DATA_')[0])
-        dtype=inputdescr.split('_DATA_')[1].split('_')[0]
+        self.dtype=inputdescr.split('_DATA_')[1].split('_')[0]
         self.all_channels=chnames
         self.chofis=[self.all_channels.index(i) for i in self.channels]
-        if dtype=='SCALO':
+        if self.dtype=='SCALO':
             self.dstypes=inputdescr.split('_SCALO_')[1].split('_lf')[0].split('_')
             self.lf=float(inputdescr.split('_lf')[1].split('_')[0])
             self.uf=float(inputdescr.split('_uf')[1].split('_')[0])
@@ -65,22 +65,45 @@ class SklearnEEGModelReader():
         print(self.stats['cm'])
         if 'optimal_threshold' in self.stats.keys():
             print(self.stats['optimal_threshold'])
-    def predict(self, raw_data, sampling_rate=125):
+    def predict(self, raw_data, sampling_rate=125, verb=False): #default neuroplay saampling rate
         preds=[]
         for i in self.chofis:
-            cdata=raw_data.T[[i]]
-            cdata=self.undersample_eeg(data=cdata, original_sampling_rate=sampling_rate)
-            cdata=cdata[-self.window:]
-            if self.predtype.isin(['optithresh','customthresh','proba']):
-                prediction=self.model.predict_proba(cdata)
+            self.cdata=raw_data.T[[i]]
+            if verb==True:
+                print(self.cdata.shape)
+                print(self.cdata)
+            self.cdata=self.undersample_eeg(data=self.cdata, original_sampling_rate=sampling_rate)
+            if verb==True:
+                print(self.cdata.shape)
+                print(self.cdata)
+            self.cdata=self.cdata[:,-self.window:]
+            if verb==True:
+                print(self.cdata.shape)
+                print(self.cdata)
+            if len(self.cdata.shape)>1:
+                self.cdata=self.cdata[0]
+            if self.dtype=='SCALO':
+                res=self.get_scalogram(sigprobe=self.cdata)
+                self.scalo=res[2]
+                self.cdata=self.preddata_fromscalo(scalodata=self.scalo)
+                if verb==True:
+                    print(self.cdata.shape)
+                    print(self.cdata)
+            if len(self.cdata.shape)==1:
+                self.cdata=self.cdata.reshape(1,-1)
+            if self.predtype in ['optithresh','customthresh','proba']:
+                prediction=self.model.predict_proba(self.cdata)[:,1]
+                #if verb==True:
+                #    print(prediction)
+                #prediction=prediction[1]
                 if self.predtype=='optithresh':
-                    prediction=prediction>int(self.thresh)
+                    prediction=int(prediction>self.thresh)
                 if self.predtype=='customthresh':
-                    prediction=prediction>int(self.customthresh)
+                    prediction=int(prediction>self.customthresh)
                 if self.predtype=='proba':
                     prediction=prediction[0]
-            if self.prediction=='defaultthresh':
-                prediction==self.model.predict(cdata)
+            if self.predtype=='defaultthresh':
+                prediction==self.model.predict(self.cdata)
                 prediction=prediction[0]
 
             preds.append(prediction)
@@ -90,15 +113,31 @@ class SklearnEEGModelReader():
 
 
         return self.current_prediction
+
+    def preddata_fromscalo(self, scalodata):
+        minp=[]
+        dstypes=self.dstypes
+        if 'scalomagn' in dstypes:
+            minp.append(scalodata[3].reshape(-1))
+        if'scaloreal' in dstypes:
+            minp.append(scalodata[1].reshape(-1))
+        if 'scaloimag' in dstypes:
+            minp.append(scalodata[2].reshape(-1))
+        minp=np.hstack(minp)
+        return minp
     def undersample_eeg(self, data, original_sampling_rate, target_sampling_rate=None):
         if str(target_sampling_rate)!='None':
             target_sampling_rate=int(target_sampling_rate)
         else:
             target_sampling_rate=self.sfrequency
         downsampling_factor = original_sampling_rate / target_sampling_rate
-        downsampled = resample(data, int(len(data) / downsampling_factor))
+        #downsampled = resample(data, int(len(data) / downsampling_factor))
+        downsampled=mne.filter.resample(data, down=downsampling_factor)
         return downsampled
-    def get_scalogram(self, sigprobe, sf, lower_freq = 1, upper_freq = 40, n_scales = 32, wavelet_width = 1):
+
+
+    def get_scalogram(self, sigprobe): #, sf): #, lower_freq = 1, upper_freq = 40, n_scales = 32, wavelet_width = 1):
+        sf=self.sfrequency
         lower_freq=self.lf
         upper_freq=self.uf
         n_scales=self.nscales
