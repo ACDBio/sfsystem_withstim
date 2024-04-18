@@ -103,7 +103,7 @@ class SklearnEEGModelReader():
                 if self.predtype=='proba':
                     prediction=prediction[0]
             if self.predtype=='defaultthresh':
-                prediction==self.model.predict(self.cdata)
+                prediction=self.model.predict(self.cdata)
                 prediction=prediction[0]
 
             preds.append(prediction)
