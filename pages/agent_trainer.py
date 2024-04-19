@@ -16,7 +16,23 @@ import pandas as pd
 import  numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
+import pickle
+
 pio.templates.default = 'simple_white'
+reward_model_data=pd.read_csv('./reward_models/model_inputdescrs.txt', sep='\t')
+reward_model_data_disp=[]
+reward_models=[]
+for row in reward_model_data.index.tolist():
+    cdt=reward_model_data.iloc[row,:]
+    str=f'Model: {cdt["model"]}'
+    reward_models.append(cdt["model"])
+    reward_model_data_disp.append(str)
+    reward_model_data_disp.append(html.Br())
+    str=f'Input: {cdt["inputdescr"]}'
+    reward_model_data_disp.append(str)
+    reward_model_data_disp.append(html.Br())
+    print(cdt)
+    reward_model_data_disp.append(html.Hr())
 
 
 channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',5:'np_C4',6:'np_P4',7:'np_O2',
@@ -514,7 +530,64 @@ dbc.Offcanvas(children=[html.Br(),
     scrollable=True,
     style={'width':'95%'},
 ),
-dbc.Col(children=[dcc.Markdown("### Session Data"),
+
+
+
+
+dbc.Offcanvas(children=[html.Br(),
+    dbc.Row(justify="start", id='message_row', children=[]),
+    html.Div(id='reward_model_list', children=reward_model_data_disp),
+    html.Br(),],
+    id='r_model_info',
+    title='Available reward models',
+    is_open=False,
+    placement="end",
+    scrollable=True,
+    style={'width':'95%'},
+),
+
+dbc.Col(children=[
+                dcc.Markdown("### ML model usage"),
+                dcc.Checklist(options=['Use ML model-based reward'], value=['Use ML model-based reward'], id='use_reward_model'),
+                dcc.Dropdown(id='model prefix', options=reward_models, value='CLASSIFIER_LogisticRegression_l1_haagladen_20_slowwaves_rawframes_min_100_max_350_wi_150_wa_150_ns_500_tstroc_0.73178616_thresh_0.70.joblib', multi=False, style={'width':'50%'}),
+                
+                #dcc.Input(type='text', placeholder='model prefix', value='CLASSIFIER_LogisticRegression_l1_haagladen_20_slowwaves_rawframes_min_100_max_350_wi_150_wa_150_ns_500_tstroc_0.73178616_thresh_0.70', id='r_model_path', size= '150'),
+                html.Br(),
+                dcc.Input(type='text', placeholder='model input descriptor', value='CHANNELS_np_C3,np_P3_SF_100_WIN_150_DATA_SCALO_scalomagn_lf1_uf40_nscales32_ww1', id='r_model_inputdescr', size='150'),
+                dcc.Dropdown(id='r_model_predtype',
+                options=['optithresh', 'customthresh', 'defaultthresh', 'proba'],
+                value='optithresh',
+                multi=False,
+                style={'width': '50%'}), 
+                dcc.Dropdown(id='r_model_voting',
+                options=['max'],
+                value='max',
+                multi=False,
+                style={'width': '50%'}), 
+                html.Button("Show reward model stats", id="show_r_model_stats", style=b_vis, n_clicks=0),
+                html.Br(),
+                dbc.Button(
+                    "Show reward model list",
+                    id="show_r_model_list",
+                    n_clicks=0,
+                ),
+                html.Br(),
+                html.Br(),
+                html.Br(),
+                dcc.Textarea(
+                    id='r_model_data',
+                    value='Reward model stats',
+                    style={'width': '30%', 'height': 300, 'font-size': '14px', 'line-height': '1'},
+                    maxLength=1024, # Adjust the maxLength as needed
+                    rows=64, # Adjust the number of rows as needed
+                    cols=128, # Adjust the number of columns as needed
+                ),
+
+                html.Hr(),
+                html.Br(),
+
+
+                 dcc.Markdown("### Session Data"),
                  html.Div(id='plot_style_container', children=[
                 'CSS color names for the signal plots: ',
                 dcc.Input(type='text', placeholder='CSS color name', value='black', id='signal_plot_color'), 
@@ -1040,6 +1113,41 @@ def explore_session_data_panel_formation(n1, n2, sn, nformstr, nfbins, fromedf):
 #     html.Button("Update plots", id="replot_data_btn", style=b_vis, n_clicks=0), style=invis)
 # ]
 
+@callback(
+    Output('r_model_data', "value"),
+    Input("show_r_model_stats", "n_clicks"),
+    State('model prefix','value'),
+    prevent_initial_call=True
+)
+def explore_session_data_panel_formation(n1, mpath):
+    print('HERE')
+    try:
+        if 'CLASSIFIER' in mpath:
+            suf=mpath.split('CLASSIFIER_')[1].split('.job')[0]
+            tp='CLASSIFIER_'
+        else:
+            suf=mpath.split('REGRESSOR_')[1].split('.job')[0]
+            tp='REGRESSOR_'
+
+        mpath=f'./reward_models/{tp}{suf}.joblib'
+        statpath=f'./reward_models/STATS_{suf}.pkl'
+        with open(statpath, 'rb') as f:
+            stats=pickle.load(f)
+        print(stats)
+
+        txt=f"ROC: {stats['roc_auc']} clsrep: {stats['clsrep']}, cm {stats['cm']}"
+        if 'optimal_threshold' in stats.keys():
+            txt+=f', optimal threshold: {stats["optimal_threshold"]}'
+    except Exception as e:
+        print(e)
+    return txt
+
+
+
+
+
+
+
 
 @callback(
     Output('point_info', "value"),
@@ -1419,6 +1527,18 @@ def toggle_offcanvas_scrollable(n1, n_intervals):
     trainer.env.previous_episodes_max_rewards=trainer.env.previous_episodes_max_rewards[-10:]
     trainer.env.previous_episodes_total_rewards=trainer.env.previous_episodes_max_rewards[-10:]
     return n1
+
+@callback(
+    Output('r_model_info', "is_open"),
+    Input("show_r_model_list", "n_clicks"),
+    State('r_model_info', "is_open"),
+)
+def toggle_offcanvas_scrollable(n1, is_open):
+    if n1:
+        return not is_open
+    return is_open
+
+
 
 @callback(
     Output('formula_instructions', "is_open"),
