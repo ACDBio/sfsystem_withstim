@@ -27,10 +27,6 @@ import mne
 channel_spec={0:'np_O1',1:'np_P3',2:'np_C3',3:'np_F3',4:'np_F4',5:'np_C4',6:'np_P4',7:'np_O2',
               8:'sf_ch1',9:'sf_ch2',10:'sf_ch3',11:'sf_ch4',12:'sf_ch5',13:'sf_ch6',14:'sf_ch7',15:'sf_ch8',16:'sf_enc'}
 
-
-
-
-
 import numpy as np
 from scipy.signal import resample
 class SklearnEEGModelReader():

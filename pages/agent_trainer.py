@@ -565,6 +565,7 @@ dbc.Col(children=[
                 multi=False,
                 style={'width': '50%'}), 
                 dcc.Input(type='number', placeholder='custom decision threshol (for customthresh regimen)', value=0.5, id='r_model_customthresh', size='150'),
+                html.Br(),
                 html.Button("Show reward model stats", id="show_r_model_stats", style=b_vis, n_clicks=0),
                 html.Br(),
                 dbc.Button(
