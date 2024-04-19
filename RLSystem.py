@@ -19,6 +19,7 @@ import shutil
 import sounddevice as sd
 import soundfile as sf
 from scipy.io.wavfile import write as wavwrite
+import EEGModLoaders
 
 plotly.io.json.config.default_engine = 'orjson'
 websocket.enableTrace(False)
@@ -108,6 +109,10 @@ class CustomExceptionWithDetails(Exception):
         super().__init__(message)
         self.detail = detail
 
+ex_mpath='/mnt/15db7227-8d00-439f-99a4-f3adb340ef58/CODE/2024/OWNPROJ/EEG_analysis/CLASSIFIER_LogisticRegression_l1_haagladen_20_slowwaves_rawframes_min_100_max_350_wi_150_wa_150_ns_500_tstroc_0.73178616_thresh_0.70.joblib'
+ex_spath='/mnt/15db7227-8d00-439f-99a4-f3adb340ef58/CODE/2024/OWNPROJ/EEG_analysis/STATS_LogisticRegression_l1_haagladen_20_slowwaves_rawframes_min_100_max_350_wi_150_wa_150_ns_500_thresh_0.70.pkl'
+ex_inputdescr='CHANNELS_np_C3,np_P3_SF_100_WIN_150_DATA_SCALO_scalomagn_lf1_uf40_nscales32_ww1'
+
 class SFSystemCommunicator(gym.Env):
     def __init__(self, out_dict=out_dict, out_order=out_order,input_channels=['np_O1','np_P3','np_C3','np_F3','np_F4','np_C4','np_P4','np_O2','sf_enc'], 
                  n_timepoints_per_sample=100, 
@@ -150,7 +155,37 @@ class SFSystemCommunicator(gym.Env):
                  offline_mode=False,                    
                  mic_log_continuous=False,
                  mic_log_onclick=False,
-                 mic_log_sepfiles=False):
+                 mic_log_sepfiles=False,
+
+                 use_reward_model=False,
+                 r_model_path=ex_mpath,
+                 r_model_stats_path=ex_spath,
+                 r_model_inputdescr=ex_inputdescr,
+                 r_model_voting='max', #only 'max' implemented for now
+                 r_model_predtype='optithresh',  #predtype can be optithresh, customthresh, defaultthresh, proba
+                 r_model_customthresh=0.5):
+        
+
+        #model interaction startup
+        self.use_reward_model=use_reward_model
+        self.r_model_path=r_model_path
+        self.r_model_stats_path=r_model_stats_path
+        self.r_model_inputdescr=r_model_inputdescr
+        self.r_model_voting=r_model_voting
+        self.r_model_predtype=r_model_predtype
+        self.r_model_customthresh=r_model_customthresh
+        self.reward_frommodel=None
+
+        if self.use_reward_model:
+            self.ml=EEGModLoaders.SklearnEEGModelReader(modelpath=self.r_model_path, 
+                                                        statspath=self.r_model_stats_path, 
+                                                        inputdescr=self.r_model_inputdescr, 
+                                                        apply_chans_sep=True, #only this implemented for now 
+                                                        voting=self.r_model_voting, 
+                                                        predtype=self.r_model_predtype, 
+                                                        customthresh=self.r_model_customthresh)
+            
+
         self.is_paused=False
         self.mic_log_continuous=mic_log_continuous
         self.mic_log_onclick=mic_log_onclick
@@ -333,6 +368,33 @@ class SFSystemCommunicator(gym.Env):
         self.chunk_duration=5.0 #seconds
         self.audiofile='miclog_continuous.wav'
         self.is_closed=False
+
+
+        self.use_reward_model=use_reward_model
+        self.r_model_path=r_model_path
+        self.r_model_stats_path=r_model_stats_path
+        self.r_model_inputdescr=r_model_inputdescr
+        self.r_model_voting=r_model_voting
+        self.r_model_predtype=r_model_predtype
+        self.r_model_customthresh=r_model_customthresh
+        self.reward_frommodel=None
+
+
+        self.rewardscheme=json.dumps({
+            'reward_formula_string':[self.reward_formula_string],
+            'rewardmodeluse':[self.use_reward_model],
+            'r_model_path':[self.r_model_path],
+            'r_model_stats_path':[self.r_model_stats_path],
+            'r_model_inputdescr':[self.r_model_inputdescr],
+            'r_model_voting':[self.r_model_voting],
+            'r_model_predtype':[self.r_model_predtype],
+            'r_model_customthresh':[self.r_model_customthresh],
+        })
+        if self.ws_np is not None:
+            if self.write_edf_ann==True:
+                self.add_edf_log_text(text=self.rewardscheme)
+                self.write_edf_annotation_fn(ann_text=self.rewardscheme, ann_duration_ms=1)
+    
     def run_micrec_continuous(self):
         while self.is_closed==False:
             try:
@@ -605,9 +667,13 @@ class SFSystemCommunicator(gym.Env):
         if str(observations) == "None":
             observations=self.observation_space.sample() #if no observations are given extrernally, sample from the observation space
         self.populate_rewarddict(observations)
-        self.reward=ne.evaluate(self.reward_formula_string, local_dict=self.rewarddict)
-        if toreturn==True:
-            return self.reward
+        if self.use_reward_model==False:
+            self.reward=ne.evaluate(self.reward_formula_string, local_dict=self.rewarddict)
+            if toreturn==True:
+                return self.reward
+        else:
+            self.reward=self.ml.predict(self.new_observations_allchs, sampling_rate=self.sampling_frequency)
+            self.reward_frommodel=self.reward
     def init_action_space(self):
         self.action_space=spaces.Dict({})
         for key, val in self.out_dict.items():
@@ -903,6 +969,7 @@ class SFSystemCommunicator(gym.Env):
                 new_observations['fbins']=self.fbins_data 
                 self.new_observations_tarchs['fbins']=new_observations['fbins'][self.channels_of_interest_inds,:]
         new_observations=OrderedDict(new_observations)
+        self.new_observations_allchs=new_observations
         return new_observations
     def write_signal_logs(self):
         if self.record_fft==True:
@@ -1574,6 +1641,15 @@ class stable_baselines_model_trainer():
         env_data['session_settings']['algorithm']=self.algorithm
         env_data['session_settings']['policy']=self.policy
         env_data['session_settings']['n_steps_per_timestep']=self.n_steps_per_timestep
+
+        env_data['session_settings']['reward_formula_string']=self.env.reward_formula_string
+        env_data['session_settings']['use_reward_model']=self.env.use_reward_model
+        env_data['session_settings']['r_model_path']=self.env.r_model_path
+        env_data['session_settings']['r_model_stats_path']=self.env.r_model_stats_path
+        env_data['session_settings']['r_model_inputdescr']=self.env.r_model_inputdescr
+        env_data['session_settings']['r_model_voting']=self.env.r_model_voting
+        env_data['session_settings']['r_model_predtype']=self.env.r_model_predtype
+        env_data['session_settings']['r_model_customthresh']=self.env.r_model_customthresh
         self.env_data=env_data
     def get_state_fromlogfile(self, logfile=None):
         if str(logfile)=='None':

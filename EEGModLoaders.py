@@ -123,7 +123,7 @@ class SklearnEEGModelReader():
             self.allcurpreds=preds
             self.current_prediction=np.max(preds)
 
-
+        print('predicted')
         return self.current_prediction
 
     def preddata_fromscalo(self, scalodata):
