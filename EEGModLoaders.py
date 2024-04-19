@@ -55,7 +55,16 @@ class SklearnEEGModelReader():
             self.uf=float(inputdescr.split('_uf')[1].split('_')[0])
             self.nscales=int(inputdescr.split('nscales')[1].split('_')[0])
             self.ww=int(inputdescr.split('ww')[1]) #.split('.')[0])
-        self.model=load(self.mpath)
+        self.model_data=load(self.mpath)
+        if len(self.model_data)>1:
+            self.transforms=self.model_data[0]
+            self.model=self.model_data[1]
+            print('Preprocessing objects found and loaded with the model')
+        else:
+            self.transforms=[]
+            self.model=self.model_data[0]
+
+
         with open(self.spath, 'rb') as f:
             self.stats=pickle.load(f)
         print('model data processed')
@@ -91,6 +100,9 @@ class SklearnEEGModelReader():
                     print(self.cdata)
             if len(self.cdata.shape)==1:
                 self.cdata=self.cdata.reshape(1,-1)
+            if len(self.transforms)>0:
+                for scalr in self.transforms:
+                    self.cdata=scalr.transform(self.cdata)
             if self.predtype in ['optithresh','customthresh','proba']:
                 prediction=self.model.predict_proba(self.cdata)[:,1]
                 #if verb==True:
