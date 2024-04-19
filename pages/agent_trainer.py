@@ -564,6 +564,7 @@ dbc.Col(children=[
                 value='max',
                 multi=False,
                 style={'width': '50%'}), 
+                dcc.Input(type='number', placeholder='custom decision threshol (for customthresh regimen)', value=0.5, id='r_model_customthresh', size='150'),
                 html.Button("Show reward model stats", id="show_r_model_stats", style=b_vis, n_clicks=0),
                 html.Br(),
                 dbc.Button(
@@ -1120,7 +1121,6 @@ def explore_session_data_panel_formation(n1, n2, sn, nformstr, nfbins, fromedf):
     prevent_initial_call=True
 )
 def explore_session_data_panel_formation(n1, mpath):
-    print('HERE')
     try:
         if 'CLASSIFIER' in mpath:
             suf=mpath.split('CLASSIFIER_')[1].split('.job')[0]
@@ -1869,6 +1869,13 @@ def get_state_from_model_logfile(logfile=None):
           State('start_on_reward_sig_qual', 'value'),
           State('reward_np_sigqual_thresh', 'value'),
           State('mic_log_opts', 'value'),
+
+          State('use_reward_model','value'),
+          State('model prefix', 'value'),
+          State('r_model_inputdescr', 'value'),
+          State('r_model_predtype','value'),
+          State('r_model_voting','value'),
+          State('r_model_customthresh', 'value'),
           prevent_initial_call=True)
 def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_clicks_additional, n_clicks_run_trained, n_clicks_run_timer, n_clicks_run_direct_feedback, n_clicks_stop_timer, n_clicks_stop_direct_feedback, 
                      n_clicks_run_action,  n_clicks_action_from_string,
@@ -1895,9 +1902,31 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                     pause_learning_if_reward_sig_qual_false,
                     start_on_reward_sig_qual,
                     reward_np_sigqual_thresh,
-                    mic_log_opts
+                    mic_log_opts,
+                    use_reward_model,
+                    model_prefix,
+                    r_model_inputdescr,
+                    r_model_predtype,
+                    r_model_voting,
+                    r_model_customthresh
                     ):
     
+    if len(use_reward_model)>0:
+        use_reward_model=True
+    else:
+        use_reward_model=False
+    if 'CLASSIFIER' in mpath:
+        suf=model_prefix.split('CLASSIFIER_')[1].split('.job')[0]
+        tp='CLASSIFIER_'
+    else:
+        suf=model_prefix.split('REGRESSOR_')[1].split('.job')[0]
+        tp='REGRESSOR_'
+
+    r_model_path=f'./reward_models/{tp}{suf}.joblib'
+    r_model_stats_path=f'./reward_models/STATS_{suf}.pkl'
+
+
+
 
     edf_ann_fn=session_name+'_edf'
     if 'Continuous logging' in mic_log_opts:
@@ -2032,7 +2061,14 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                                 send_np_signal_to_display=send_np_signal_to_display,
                                                 mic_log_continuous=mic_log_continuous,
                                                 mic_log_onclick=mic_log_onclick,
-                                                mic_log_sepfiles=mic_log_sepfiles)
+                                                mic_log_sepfiles=mic_log_sepfiles,
+                                                use_reward_model=use_reward_model,
+                                                r_model_path=r_model_path,
+                                                r_model_stats_path=r_model_stats_path,
+                                                r_model_inputdescr=r_model_inputdescr,
+                                                r_model_voting=r_model_voting,
+                                                r_model_predtype=r_model_predtype,
+                                                r_model_customthresh=r_model_customthresh)
         time.sleep(5)    
 
 
@@ -2166,7 +2202,15 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
                                             send_np_signal_to_display=send_np_signal_to_display,
                                             mic_log_continuous=mic_log_continuous,
                                             mic_log_onclick=mic_log_onclick,
-                                            mic_log_sepfiles=mic_log_sepfiles)    
+                                            mic_log_sepfiles=mic_log_sepfiles,
+
+                                            use_reward_model=sd['use_reward_model'],
+                                            r_model_path=sd['r_model_path'],
+                                            r_model_stats_path=sd['r_model_stats_path'],
+                                            r_model_inputdescr=sd['r_model_inputdescr'],
+                                            r_model_voting=sd['r_model_voting'],
+                                            r_model_predtype=sd['r_model_predtype'],
+                                            r_model_customthresh=sd['r_model_customthresh'])    
         time.sleep(20) 
         trainer=stable_baselines_model_trainer(initialized_environment=env,
                                                             algorithm=sd['algorithm'],
