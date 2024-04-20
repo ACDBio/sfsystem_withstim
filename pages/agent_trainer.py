@@ -18,6 +18,8 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import pickle
 
+
+
 pio.templates.default = 'simple_white'
 reward_model_data=pd.read_csv('./reward_models/model_inputdescrs.txt', sep='\t')
 reward_model_data_disp=[]
@@ -315,9 +317,14 @@ layout=html.Div(
                         html.Div(['Phasor 2 initial frequency: ', 
                                             dcc.Input(type='number', placeholder='Frequency, Hz', value=440, id='phasor_2_freq')]),
                         'Phasor 2 initial frequency span',
-                        dcc.RangeSlider(min=1, max=30, step=1, marks=None, value=[1, 50], tooltip={"placement": "bottom", "always_visible": True},id='phasor_2_span'),
+                        dcc.RangeSlider(min=1, max=30, step=1, marks=None, value=[1, 50], tooltip={"placement": "bottom", "always_visible": True},id='phasor_2_span'),                                                                           
                           ]
                         ),
+                        html.Br(),
+                        dcc.Markdown("#### Play audio"),
+                        dcc.Dropdown(id='audio_recording_path', options=os.listdir('./suggestions'),multi=False),
+                        dcc.Checklist(id='audio_options', options=['Auto Play', 'Loop'], value=['Auto Play', 'Loop']),
+                        html.Audio(id='audio',src='/suggestions/test_audio.mp3', controls=True, autoPlay=True, loop=True)
                       ]),
           html.Br(),
           dbc.Row(justify='start', children=[
@@ -1641,6 +1648,24 @@ def change_defaults(dm, vol):
         return ['0,0,0' for i in range(8)]+[0]
     
 
+@callback(Output('audio','src'),
+          Output('audio','autoPlay'),
+          Output('audio','loop'),
+          Input('audio_recording_path', 'value'),
+          Input('audio_options','value'),
+          prevent_initial_call=True)
+def audio_conttrols(src, opts):
+    src='/suggestions/' +src
+    if 'Auto Play' in opts:
+        autoplay=True
+    else:
+        autoplay=False
+    if 'Loop' in opts:
+        loop=True
+    else:
+        loop=False
+    return src, autoplay, loop
+
 def copy_file(source_file_path, destination_folder_path):
     shutil.copy(source_file_path, destination_folder_path)
 @callback(Output('session_library', 'data'),
@@ -1916,7 +1941,7 @@ def collect_settings(n_clicks_t, n_clicks_nt, n_clicks_static, n_clicks_stop, n_
         use_reward_model=True
     else:
         use_reward_model=False
-    if 'CLASSIFIER' in mpath:
+    if 'CLASSIFIER' in model_prefix:
         suf=model_prefix.split('CLASSIFIER_')[1].split('.job')[0]
         tp='CLASSIFIER_'
     else:

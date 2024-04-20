@@ -3,7 +3,10 @@ import dash_bootstrap_components as dbc
 import plotly.io as pio
 import os
 import threading
+from dash import html
 pio.templates.default = 'simple_white'
+from flask import send_from_directory
+
 # use_neuroplay=True
 # if use_neuroplay:
 #     neuroplay_loc='/home/biorp/NeuroPlayPro/NeuroPlayPro.sh'
@@ -35,7 +38,7 @@ navbar = dbc.NavbarSimple(
 )
 
 app.layout = dbc.Container(
-    [navbar, dash.page_container],
+    [navbar, html.Div(), dash.page_container],
     fluid=True,
 )
 
@@ -43,3 +46,6 @@ app.layout = dbc.Container(
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+@app.server.route('/suggestions/<path:filename>')
+def serve_mp3(filename):
+    return send_from_directory('suggestions', filename)

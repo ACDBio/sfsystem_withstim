@@ -56,13 +56,18 @@ class SklearnEEGModelReader():
             self.nscales=int(inputdescr.split('nscales')[1].split('_')[0])
             self.ww=int(inputdescr.split('ww')[1]) #.split('.')[0])
         self.model_data=load(self.mpath)
-        if len(self.model_data)>1:
-            self.transforms=self.model_data[0]
-            self.model=self.model_data[1]
-            print('Preprocessing objects found and loaded with the model')
-        else:
+        try:
+            if len(self.model_data)>1:
+                self.transforms=self.model_data[0]
+                self.model=self.model_data[1]
+                print('Preprocessing objects found and loaded with the model')
+            else:
+                self.transforms=[]
+                self.model=self.model_data[0]
+        except:
             self.transforms=[]
-            self.model=self.model_data[0]
+            self.model=self.model_data
+            print('Preprocessing objects not found with the model')
 
 
         with open(self.spath, 'rb') as f:

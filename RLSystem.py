@@ -169,8 +169,8 @@ class SFSystemCommunicator(gym.Env):
                  r_model_voting='max', #only 'max' implemented for now
                  r_model_predtype='optithresh',  #predtype can be optithresh, customthresh, defaultthresh, proba
                  r_model_customthresh=0.5):
-        
-
+        self.ws_np=None
+        self.ws_sf=None
         #model interaction startup
         self.use_reward_model=use_reward_model
         self.r_model_path=r_model_path
@@ -455,8 +455,13 @@ class SFSystemCommunicator(gym.Env):
                     break
             except Exception as e:
                 print(e)
-                if self.ws_np.sock is None:
-                    print('Socket closed. Breaking.')
+                if self.ws_np is not None:
+                    if self.ws_np.sock is None:
+                        print('Socket closed. Breaking.')
+                        return True
+                        break
+                else:
+                    print('No neuroplay data required, skipping')
                     return True
                     break
         chnames=devinfo["currentChannelsNames"]
@@ -962,6 +967,7 @@ class SFSystemCommunicator(gym.Env):
         #    except:
         #        raise ConnectionAbortedError
         new_observations['raw_data']=self.raw_data
+        print('raw_data set up')
         self.new_observations_tarchs['raw_data']=new_observations['raw_data'][:,self.channels_of_interest_inds]
         if self.do_fft:
          self.fft=self.get_fft_allchannels(raw_data=self.raw_data)
@@ -975,6 +981,7 @@ class SFSystemCommunicator(gym.Env):
                 self.new_observations_tarchs['fbins']=new_observations['fbins'][self.channels_of_interest_inds,:]
         new_observations=OrderedDict(new_observations)
         self.new_observations_allchs=new_observations
+        print('new observations processed')
         return new_observations
     def write_signal_logs(self):
         if self.record_fft==True:
