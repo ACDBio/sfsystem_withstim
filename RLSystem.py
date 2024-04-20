@@ -682,8 +682,15 @@ class SFSystemCommunicator(gym.Env):
             if toreturn==True:
                 return self.reward
         else:
-            self.reward=self.ml.predict(self.new_observations_allchs, sampling_rate=self.sampling_frequency)
-            self.reward_frommodel=self.reward
+            print('predicting with the ml')
+            try:
+                self.reward=self.ml.predict(self.new_observations_allchs['raw_data'], sampling_rate=self.sampling_frequency, verb=False)
+                self.reward_frommodel=self.reward
+                if toreturn==True:
+                    return self.reward
+            except Exception as e:
+                print('On model-based reward evaluation received:')
+                print(e)
     def init_action_space(self):
         self.action_space=spaces.Dict({})
         for key, val in self.out_dict.items():
@@ -1022,12 +1029,13 @@ class SFSystemCommunicator(gym.Env):
                     if self.ws_np is not None:
                         if self.write_edf_ann==True:       
                             self.write_tolog(json.dumps({'MICLOGF':[self.micf_cur]}))               
-                            self.write_edf_annotation_fn(text=f'MICLOGF_episode_{self.current_episode}_step_{self.cur_step}_timestamp_{formatted_now}.wav', ann_duration_ms=self.step_stim_length_millis)
+                            self.write_edf_annotation_fn(ann_text=f'MICLOGF_episode_{self.current_episode}_step_{self.cur_step}_timestamp_{formatted_now}.wav', ann_duration_ms=self.step_stim_length_millis)
                     micthread_sepf=threading.Thread(target=self.run_micreg_singular)
                     micthread_sepf.daemon = True
                     micthread_sepf.start()
                     print('Started sepfile mic log')
-
+                print('sleeping for:')
+                print(self.step_stim_length)
                 time.sleep(self.step_stim_length)
                 # if self.ws_np is not None:
                 #     self.get_np_sig_qual()
@@ -1036,6 +1044,7 @@ class SFSystemCommunicator(gym.Env):
                 new_observations=self.sample_and_process_observations_from_device()
                 self.cur_observations=new_observations
                 reward=self.get_reward(observations=new_observations, toreturn=True)
+                print('reward obtained')
                 reward_val=reward.tolist()
                 #if action!=self.default_actions:
                 self.reward_cur=reward
@@ -1137,7 +1146,9 @@ class SFSystemCommunicator(gym.Env):
             else:
                 print('No connection')
                 return False, False, False, False #False
-        except:
+        except Exception as e:
+            print('Exception during step execution:')
+            print(e)
             return False, False, False, False
             #raise CustomExceptionWithDetails("Step unfinished", 'No connection')
     def clear_all_stats(self):

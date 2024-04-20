@@ -26,12 +26,12 @@ reward_model_data_disp=[]
 reward_models=[]
 for row in reward_model_data.index.tolist():
     cdt=reward_model_data.iloc[row,:]
-    str=f'Model: {cdt["model"]}'
+    string=f'Model: {cdt["model"]}'
     reward_models.append(cdt["model"])
-    reward_model_data_disp.append(str)
+    reward_model_data_disp.append(string)
     reward_model_data_disp.append(html.Br())
-    str=f'Input: {cdt["inputdescr"]}'
-    reward_model_data_disp.append(str)
+    string=f'Input: {cdt["inputdescr"]}'
+    reward_model_data_disp.append(string)
     reward_model_data_disp.append(html.Br())
     print(cdt)
     reward_model_data_disp.append(html.Hr())
